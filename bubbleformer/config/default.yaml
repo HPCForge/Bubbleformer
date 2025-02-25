@@ -1,9 +1,9 @@
-log_dir: /pub/sheikhh1/bubbleformer_logs
+log_dir: ./bubbleformer_logs
 seed: 42
 
 distributed: True
-nodes:
-devices:
+nodes: 1
+devices: 1
 
 max_epochs: 400
 batch_size: 4
@@ -14,12 +14,12 @@ use_wandb: True
 wandb_tags:
   - baseline
   - relative_l2_loss
-  - Modern-UNet
-  - PB-Saturated
+  - AViT-S_29M
+  - PB-Combined
 
 defaults:
   - _self_
-  - data_cfg: poolboiling_saturated
-  - model_cfg: unet_modern
+  - data_cfg: poolboiling_combined
+  - model_cfg: avit_small_moe
   - optim_cfg: adamw
   - scheduler_cfg: cosine_warmup

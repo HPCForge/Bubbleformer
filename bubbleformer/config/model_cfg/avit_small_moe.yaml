@@ -1,0 +1,10 @@
+name: avit_moe
+params:
+  patch_size: 16
+  embed_dim: 384
+  processor_blocks: 12
+  num_heads: 6
+  drop_path: 0.2
+  n_experts: 6
+  n_shared_experts: 1
+  top_k: 2
