@@ -78,6 +78,7 @@ class AViTMoE(nn.Module):
     def __init__(
         self,
         fields: int = 3,
+        time_window: int = 12,
         patch_size: int = 16,
         embed_dim: int = 768,
         num_heads: int = 12,
