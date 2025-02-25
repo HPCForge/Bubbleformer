@@ -165,16 +165,16 @@ class ForecastModule(L.LightningModule):
         }
 
     def on_train_epoch_start(self):
-        self.train_start_time = time.time()  
+        self.train_start_time = time.perf_counter()  
         
     def on_train_epoch_end(self):
         if self.train_start_time is not None: # when resuming from middle of epoch, variable stays none
-            train_time = time.time() - self.train_start_time  
+            train_time = time.perf_counter() - self.train_start_time  
             if self.log_wandb and self.trainer.is_global_zero:
                 wandb.log({"train_epoch_time": train_time, "epoch": self.current_epoch})  
         
     def on_validation_epoch_start(self):
-        self.val_start_time = time.time()  
+        self.val_start_time = time.perf_counter()  
         if self.log_wandb and self.trainer.is_global_zero:
             train_loss = self.trainer.callback_metrics["train_loss"].item()
             wandb.log({"train_loss_epoch": train_loss, "epoch": self.current_epoch})
@@ -182,7 +182,7 @@ class ForecastModule(L.LightningModule):
 
     def on_validation_epoch_end(self):
         if self.val_start_time is not None:
-            val_time = time.time() - self.val_start_time  
+            val_time = time.perf_counter() - self.val_start_time  
             if self.log_wandb and self.trainer.is_global_zero:
                 wandb.log({"val_epoch_time": val_time, "epoch": self.current_epoch})  
             
