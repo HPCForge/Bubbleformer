@@ -79,6 +79,8 @@ def main(cfg: DictConfig) -> None:
 
     if params["checkpoint_path"] is None:
         log_id = (
+            # "Combined_" +
+            "Modified_Test_" +
             cfg.model_cfg.name.lower() + "_"
             + cfg.data_cfg.dataset.lower() + "_"
             + os.getenv("SLURM_JOB_ID")
@@ -158,10 +160,10 @@ def main(cfg: DictConfig) -> None:
     wandb_run = None
     if cfg.use_wandb and is_leader_process(): # Load only one wandb run
         try:
-            wandb_key_path = "bubbleformer/config/wandb_api_key.txt"
-            with open(wandb_key_path, "r", encoding="utf-8") as f:
-                wandb_key = f.read().strip()
-            wandb.login(key=wandb_key)
+            # wandb_key_path = "bubbleformer/config/wandb_api_key.txt"
+            # with open(wandb_key_path, "r", encoding="utf-8") as f:
+            #     wandb_key = f.read().strip()
+            # wandb.login(key=wandb_key)
             wandb_run = wandb.init(
                 project="bubbleformer",
                 name=log_id,
