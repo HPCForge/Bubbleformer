@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from einops import rearrange
 
 from timm.layers import DropPath
-from bubbleformer.layers import GeluMLP, RelativePositionBias, ContinuousPositionBias1D
+from bubbleformer.layers import GeluMLP, RelativePositionBias, ContinuousPositionBias1D, MoE
 
 
 class TemporalAttentionBlock(nn.Module):
@@ -213,6 +213,145 @@ class AxialAttentionBlock(nn.Module):
         inp = x.clone()
         x = rearrange(x, "bt c h w -> bt h w c")
         x = self.mlp(x)
+        x = rearrange(x, "bt h w c -> bt c h w")
+        x = self.mlp_norm(x)
+        out = inp + self.drop_path(self.gamma_mlp[None, :, None, None] * x)
+
+        return out
+
+
+class AxialAttentionMoEBlock(nn.Module):
+    """
+    Axial Attention Block with MoE
+    Args:
+        embed_dim (int):Embedding dimension
+        num_heads (int): Number of attention heads
+        drop_path (float): Dropout rate
+        layer_scale_init_value (float): Initial value for layer scale
+        bias_type (str): Type of bias to use
+        n_experts (int): Number of experts
+        n_shared_experts (int): Number of shared experts
+        top_k (int): Number of activated experts to use
+    """
+    def __init__(
+        self,
+        embed_dim=768,
+        num_heads=12,
+        drop_path=0,
+        layer_scale_init_value=1e-6,
+        bias_type="rel",
+        n_experts=6,
+        n_shared_experts=1,
+        top_k=2,
+    ):
+        super().__init__()
+        self.num_heads = num_heads
+        self.norm1 = nn.InstanceNorm2d(embed_dim, affine=True)
+        self.norm2 = nn.InstanceNorm2d(embed_dim, affine=True)
+        self.gamma_att = (
+            nn.Parameter(
+                layer_scale_init_value * torch.ones((embed_dim)), requires_grad=True
+            )
+            if layer_scale_init_value > 0
+            else None
+        )
+        self.gamma_mlp = (
+            nn.Parameter(
+                layer_scale_init_value * torch.ones((embed_dim)), requires_grad=True
+            )
+            if layer_scale_init_value > 0
+            else None
+        )
+
+        self.input_head = nn.Conv2d(embed_dim, 3 * embed_dim, 1)
+        self.output_head = nn.Conv2d(embed_dim, embed_dim, 1)
+        self.qnorm = nn.LayerNorm(embed_dim // num_heads)
+        self.knorm = nn.LayerNorm(embed_dim // num_heads)
+        if bias_type == "none":
+            self.rel_pos_bias = lambda x, y: None
+        elif bias_type == "continuous":
+            self.rel_pos_bias = ContinuousPositionBias1D(n_heads=num_heads)
+        else:
+            self.rel_pos_bias = RelativePositionBias(n_heads=num_heads)
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+
+        # self.mlp = GeluMLP(embed_dim)
+        # 28.1 M parameters with 6 router experts, 1 shared expert
+        self.moe = MoE(embed_dim, embed_dim // 2, n_routed_experts=n_experts, n_shared_experts=n_shared_experts, top_k=top_k)
+        self.mlp_norm = nn.InstanceNorm2d(embed_dim, affine=True)
+
+    def forward(self, x):
+        """
+        Args:
+            x (torch.Tensor): Input tensor of shape (BT, C, H, W)
+        Returns:
+            torch.Tensor: Output tensor of shape (BT, C, H, W)
+        """
+        _, _, h, w = x.shape
+        inp = x.clone()
+        x = self.norm1(x)
+        x = self.input_head(x)
+
+        x = rearrange(x, "bt (he c) h w ->  bt he h w c", he=self.num_heads)
+        q, k, v = x.tensor_split(3, dim=-1)
+        q, k = self.qnorm(q), self.knorm(k)
+
+        # Do attention with current q, k, v matrices along each spatial axis then average results
+        # X direction attention
+        qx, kx, vx = map(
+            lambda x: rearrange(x, "bt he h w c ->  (bt h) he w c"), [q, k, v]
+        )
+        rel_pos_bias_x = self.rel_pos_bias(w, w)
+        if rel_pos_bias_x is not None:
+            # pylint: disable=not-callable
+            xx = F.scaled_dot_product_attention(
+                query=qx,
+                key=kx,
+                value=vx,
+                attn_mask=rel_pos_bias_x,
+            )
+        else:
+            # pylint: disable=not-callable
+            xx = F.scaled_dot_product_attention(
+                query=qx.contiguous(),
+                key=kx.contiguous(),
+                value=vx.contiguous(),
+            )
+        xx = rearrange(xx, "(bt h) he w c -> bt (he c) h w", h=h)
+
+        # Y direction attention
+        qy, ky, vy = map(
+            lambda x: rearrange(x, "bt he h w c ->  (bt w) he h c"), [q, k, v]
+        )
+        rel_pos_bias_y = self.rel_pos_bias(h, h)
+        if rel_pos_bias_y is not None:
+            # pylint: disable=not-callable
+            xy = F.scaled_dot_product_attention(
+                query=qy,
+                key=ky,
+                value=vy,
+                attn_mask=rel_pos_bias_y,
+            )
+        else:
+            # pylint: disable=not-callable
+            xy = F.scaled_dot_product_attention(
+                query=qy.contiguous(),
+                key=ky.contiguous(),
+                value=vy.contiguous(),
+            )
+        xy = rearrange(xy, "(bt w) he h c -> bt (he c) h w", w=w)
+
+        # Combine
+        x = (xx + xy) / 2
+        x = self.norm2(x)
+        x = self.output_head(x)
+        x = self.drop_path(x * self.gamma_att[None, :, None, None]) + inp
+
+        # MLP
+        inp = x.clone()
+        x = rearrange(x, "bt c h w -> bt h w c")
+        # x = self.mlp(x)
+        x = self.moe(x)
         x = rearrange(x, "bt h w c -> bt c h w")
         x = self.mlp_norm(x)
         out = inp + self.drop_path(self.gamma_mlp[None, :, None, None] * x)
