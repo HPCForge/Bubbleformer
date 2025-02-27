@@ -13,6 +13,7 @@ from bubbleformer.utils.losses import LpLoss
 from bubbleformer.utils.lr_schedulers import CosineWarmupLR
 from bubbleformer.utils.plot_utils import wandb_sdf_plotter, wandb_temp_plotter, wandb_vel_plotter
 import time
+from bubbleformer.layers.moe import MoETracker
 
 class ForecastModule(L.LightningModule):
     """
@@ -51,10 +52,14 @@ class ForecastModule(L.LightningModule):
 
         self.criterion = LpLoss(d=2, p=2, reduce_dims=[0,1,2], reductions=["mean", "mean", "sum"])
         self.model = get_model(self.model_cfg["name"], **self.model_cfg["params"])
+        # self.model = torch.compile(self.model)
         self.t_max = None
         self.validation_sample = None
         self.train_start_time = None
         self.val_start_time = None
+        
+        # Initialize MoE tracker
+        self.moe_tracker = MoETracker(self.model)
     
     def setup(
         self,
@@ -178,14 +183,24 @@ class ForecastModule(L.LightningModule):
         if self.log_wandb and self.trainer.is_global_zero:
             train_loss = self.trainer.callback_metrics["train_loss"].item()
             wandb.log({"train_loss_epoch": train_loss, "epoch": self.current_epoch})
-                
+        
+        # Enable MoE tracking for validation
+        self.moe_tracker.enable_tracking()
+        self.moe_tracker.reset_counts()
 
     def on_validation_epoch_end(self):
         if self.val_start_time is not None:
             val_time = time.perf_counter() - self.val_start_time  
             if self.log_wandb and self.trainer.is_global_zero:
                 wandb.log({"val_epoch_time": val_time, "epoch": self.current_epoch})  
-            
+        
+        # Plot and log MoE token distribution
+        if self.log_wandb and self.trainer.is_global_zero:
+            self.moe_tracker.plot_distribution(log_wandb=True)
+        
+        # Disable MoE tracking after validation
+        self.moe_tracker.disable_tracking()
+        
         fields = self.data_cfg["fields"]
         if self.validation_sample is None:
             return
