@@ -3,6 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import math
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import wandb
 
 # # SwiGLU MLP
 # class MLP(nn.Module):
@@ -105,15 +109,52 @@ class MoE(nn.Module):
         # self.shared_experts = MLP(hidden_dim, n_shared_experts * inter_dim)
         self.shared_experts = MLP(hidden_dim, inter_dim)
         
+        # Add tracking variables
+        self.tracking_enabled = False
+        self.expert_token_counts = None
+        
+    def enable_tracking(self):
+        """Enable tracking of token distribution across experts"""
+        self.tracking_enabled = True
+        self.expert_token_counts = torch.zeros(self.n_routed_experts)
+        
+    def disable_tracking(self):
+        """Disable tracking of token distribution"""
+        self.tracking_enabled = False
+        
+    def get_token_counts(self):
+        """Return the current token counts per expert"""
+        if self.expert_token_counts is None:
+            return None
+        return self.expert_token_counts.clone()
+        
+    def reset_token_counts(self):
+        """Reset token counts to zero"""
+        if self.expert_token_counts is not None:
+            self.expert_token_counts.zero_()
+        
     def forward(self, x):
-        batch_size, height, width, channel = x.shape # X Shape: (batch_size, height, width, hidden_dim)
-        x = x.contiguous().reshape(-1, channel)  # X Shape: (batch_size * height * width, hidden_dim))
+        batch_size, height, width, hidden_dim = x.shape # X Shape: (batch_size, height, width, hidden_dim)
+        
+        # if self.training:
+        #     print("TRAINING - x shape: ", x.shape) # torch.Size([20, 32, 32, 384])
+        # else:
+        #     print("VALIDATION - x shape: ", x.shape) # torch.Size([20, 32, 32, 384])
+        
+        x = x.contiguous().reshape(-1, hidden_dim)  # X Shape: (batch_size * height * width, hidden_dim))
         
         weights, indices = self.gate(x)  # Weights Shape: (batch_size * height * width, topk)
         
         output = torch.zeros_like(x)  # Placeholder for MoE output
         # Count the occurrences of each index in the indices tensor and then converting the result to a list
         counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts).tolist() # Shape: (n_routed_experts, )
+
+        # Track token distribution if enabled
+        # Number of tokens = batch_size × time_window × height × width
+        # Number of tokens = 4 × 5 × 32 × 32 = 20480
+        if self.tracking_enabled and self.expert_token_counts is not None:
+            token_counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts)
+            self.expert_token_counts += token_counts.to(self.expert_token_counts.device)
 
         for i in range(self.n_routed_experts):
             if counts[i] ==  0:
@@ -124,4 +165,140 @@ class MoE(nn.Module):
             idx, top = torch.where(indices == i)
             output[idx] += expert(x[idx]) * weights[idx, top, None]
         shared_expert_output = self.shared_experts(x)
-        return (output + shared_expert_output).view(batch_size, height, width, channel)  # Reshape back to original form
+        return (output + shared_expert_output).view(batch_size, height, width, hidden_dim)  # Reshape back to original form
+
+class MoETracker:
+    """
+    Utility class to track token distribution across experts in MoE layers
+    """
+    def __init__(self, model):
+        self.model = model
+        self.moe_layers = []
+        self.layer_names = []
+        self._find_moe_layers(model)
+        self.is_tracking = False
+        
+    def _find_moe_layers(self, module, prefix=""):
+        """Recursively find all MoE layers in the model"""
+        
+        for name, child in module.named_children():
+            full_name = f"{prefix}.{name}" if prefix else name
+            if isinstance(child, MoE):
+                self.moe_layers.append(child)
+                self.layer_names.append(full_name)
+            else:
+                self._find_moe_layers(child, full_name)
+    
+    def enable_tracking(self):
+        """Enable tracking on all MoE layers"""
+        for layer in self.moe_layers:
+            layer.enable_tracking()
+        self.is_tracking = True
+        
+    def disable_tracking(self):
+        """Disable tracking on all MoE layers"""
+        for layer in self.moe_layers:
+            layer.disable_tracking()
+        self.is_tracking = False
+        
+    def reset_counts(self):
+        """Reset token counts on all MoE layers"""
+        for layer in self.moe_layers:
+            layer.reset_token_counts()
+    
+    def get_layer_counts(self):
+        """Get token counts for each layer"""
+        if not self.is_tracking:
+            return None
+            
+        counts = []
+        for layer in self.moe_layers:
+            counts.append(layer.get_token_counts())
+        return counts
+    
+    def get_total_counts(self):
+        """Get total token counts across all layers"""
+        if not self.is_tracking:
+            return None
+            
+        total = None
+        for layer in self.moe_layers:
+            counts = layer.get_token_counts()
+            if counts is not None:
+                if total is None:
+                    total = counts.clone()
+                else:
+                    total += counts
+        return total
+    
+    def plot_distribution(self, log_wandb=False):
+        """Plot token distribution across experts for each layer and in total"""
+        if not self.is_tracking:
+            return None
+            
+        layer_counts = self.get_layer_counts()
+        total_counts = self.get_total_counts()
+        
+        if layer_counts is None or total_counts is None:
+            return None
+            
+        # Create a figure with subplots for each layer plus the total
+        n_plots = len(layer_counts) + 1
+        fig, axes = plt.subplots(1, n_plots, figsize=(n_plots * 4, 5))
+        
+        # If there's only one subplot, axes is not a list
+        if n_plots == 2:
+            axes = [axes[0], axes[1]]
+        
+        # Plot individual layer distributions
+        for i, (counts, name) in enumerate(zip(layer_counts, self.layer_names)):
+            counts_np = counts.cpu().numpy()
+            df = pd.DataFrame({
+                'Expert ID': pd.Series(range(len(counts_np))).astype(int),
+                'Token Count': counts_np
+            })
+            
+            sns.barplot(x='Expert ID', y='Token Count', data=df, ax=axes[i])
+            axes[i].set_title(f"Layer: {name}")
+            axes[i].set_xlabel("Expert ID")
+            axes[i].set_ylabel("Token Count")
+        
+        # Plot total distribution
+        total_np = total_counts.cpu().numpy()
+        df = pd.DataFrame({
+            'Expert ID': pd.Series(range(len(total_np))).astype(int),
+            'Token Count': total_np
+        })
+        
+        sns.barplot(x='Expert ID', y='Token Count', data=df, ax=axes[-1])
+        axes[-1].set_title("Total Across All Layers")
+        axes[-1].set_xlabel("Expert ID")
+        axes[-1].set_ylabel("Token Count")
+        
+        plt.tight_layout()
+        
+        if log_wandb:
+            wandb.log({"Expert Token Distribution": wandb.Image(fig)})
+        
+        return fig
+
+# Example usage during inference
+def inference_with_tracking(model, input_data):
+    # Create tracker
+    tracker = MoETracker(model)
+    
+    # Enable tracking
+    tracker.enable_tracking()
+    tracker.reset_counts()
+    
+    # Run inference
+    with torch.no_grad():
+        output = model(input_data)
+    
+    # Get and visualize results
+    fig = tracker.plot_distribution()
+    
+    # Disable tracking
+    tracker.disable_tracking()
+    
+    return output, fig
