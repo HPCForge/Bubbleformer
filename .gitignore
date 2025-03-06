@@ -26,3 +26,5 @@ outputs/
 
 # Wandb API key
 bubbleformer/config/wandb_api_key.txt
+
+*.csv
