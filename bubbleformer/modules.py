@@ -14,6 +14,8 @@ from bubbleformer.utils.lr_schedulers import CosineWarmupLR
 from bubbleformer.utils.plot_utils import wandb_sdf_plotter, wandb_temp_plotter, wandb_vel_plotter
 import time
 from bubbleformer.layers.moe import MoETracker
+import os
+import pandas as pd
 
 class ForecastModule(L.LightningModule):
     """
@@ -76,7 +78,7 @@ class ForecastModule(L.LightningModule):
 
     def training_step(
         self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
+        batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         batch_idx: int
     ) -> torch.Tensor:
         inp, tgt = batch 
@@ -196,7 +198,13 @@ class ForecastModule(L.LightningModule):
         
         # Plot and log MoE token distribution
         if self.log_wandb and self.trainer.is_global_zero:
-            self.moe_tracker.plot_distribution(log_wandb=True)
+            self.moe_tracker.plot_distribution(log_wandb=True, epoch=self.current_epoch)
+            self.moe_tracker.log_distribution_data(log_wandb=True, epoch=self.current_epoch)
+            
+        # Save MoE distribution data to disk
+        if self.trainer.is_global_zero:
+            save_dir = os.path.join(self.trainer.log_dir, f"moe_distribution/epoch_{self.current_epoch}")
+            self.save_distribution_data(save_dir)
         
         # Disable MoE tracking after validation
         self.moe_tracker.disable_tracking()
@@ -262,3 +270,41 @@ class ForecastModule(L.LightningModule):
         if self.log_wandb and self.trainer.is_global_zero:
             val_loss = self.trainer.callback_metrics["val_loss"].item()
             wandb.log({"val_loss_epoch": val_loss, "epoch": self.current_epoch})
+
+    def save_distribution_data(self, save_dir):
+        """Save MoE token distribution data to disk as CSV files"""
+        if not self.moe_tracker.is_tracking:
+            return None
+        
+        layer_counts = self.moe_tracker.get_layer_counts()
+        total_counts = self.moe_tracker.get_total_counts()
+        
+        if layer_counts is None or total_counts is None:
+            return None
+        
+        # Create directory if it doesn't exist
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # Save individual layer distributions
+        for i, (counts, name) in enumerate(zip(layer_counts, self.moe_tracker.layer_names)):
+            counts_np = counts.cpu().numpy()
+            df = pd.DataFrame({
+                'Expert ID': pd.Series(range(len(counts_np))).astype(int),
+                'Token Count': counts_np
+            })
+            
+            # Clean up layer name for filename
+            clean_name = name.replace('.', '_')
+            df.to_csv(os.path.join(save_dir, f"layer_{clean_name}_distribution.csv"), index=False)
+        
+        # Save total distribution
+        total_np = total_counts.cpu().numpy()
+        df = pd.DataFrame({
+            'Expert ID': pd.Series(range(len(total_np))).astype(int),
+            'Token Count': total_np
+        })
+        df.to_csv(os.path.join(save_dir, "total_distribution.csv"), index=False)
+        
+        return save_dir
+
+    
