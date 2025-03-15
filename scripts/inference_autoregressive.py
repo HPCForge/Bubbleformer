@@ -17,18 +17,45 @@ Usage examples:
     
     # Run both models on grav_0.2 dataset
     python inference_autoregressive.py --model both --dataset grav_0.2
+    
+    # Run with custom weights path (save directory will be auto-generated)
+    python inference_autoregressive.py --model avit_moe --dataset sat_92 --weights_path /path/to/weights.ckpt
+    
+    # Run with both custom weights path and save directory
+    python inference_autoregressive.py --model avit_moe --dataset sat_92 --weights_path /path/to/weights.ckpt --save_dir /path/to/save
 """
 
 import os
 import torch
 import argparse
+import time
 from collections import OrderedDict
 from bubbleformer.models import get_model
 from bubbleformer.data import BubblemlForecast
 from bubbleformer.utils.losses import LpLoss
 from bubbleformer.utils.plot_utils import plot_bubbleml
 
-def run_inference(model_type, dataset_name):
+def generate_save_dir_from_weights_path(weights_path):
+    """Generate a save directory base path from a weights path based on the observed pattern"""
+    import re
+    
+    # Extract the epoch number from the checkpoint filename
+    match = re.search(r'epoch=(\d+)', os.path.basename(weights_path))
+    if not match:
+        # If no epoch number found, use a default name
+        return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(weights_path))), "outputs")
+    
+    epoch_num = match.group(1)
+    
+    # Extract the base experiment directory (everything before lightning_logs)
+    base_dir = weights_path.split('/lightning_logs')[0]
+    
+    # Construct the save directory base
+    save_dir = os.path.join(base_dir, f"epoch_{epoch_num}_outputs")
+    
+    return save_dir
+
+def run_inference(model_type, dataset_name, custom_weights_path=None, custom_save_dir=None):
     """Run inference with specified model on the specified dataset"""
     print(f"\n=== Running inference with {model_type} on {dataset_name} ===\n")
     
@@ -52,8 +79,9 @@ def run_inference(model_type, dataset_name):
             "n_shared_experts": 1,
             "top_k": 2
         }
-        weights_path = "/share/crsp/lab/ai4ts/xianwz2/bubbleformer_modify/bubbleformer/bubbleformer_logs/E_6_S_1_A_2_avit_moe_poolboiling_combined_36230238/lightning_logs/version_0/checkpoints/epoch=398-step=199500.ckpt"
-        save_dir_base = "/share/crsp/lab/amowli/xianwz2/bubbleformer_modify/bubbleformer/bubbleformer_logs/E_6_S_1_A_2_avit_moe_poolboiling_combined_36230238/epoch_398_outputs"
+        # Default paths for avit_moe model
+        default_weights_path = "/share/crsp/lab/amowli/xianwz2/bubbleformer_modify/bubbleformer/bubbleformer_logs/Same_size_shared_experts_E_6_S_1_A_2_avit_moe_poolboiling_combined_36342187/lightning_logs/version_1/checkpoints/epoch=399-step=200000.ckpt"
+        default_save_dir_base = "/share/crsp/lab/amowli/xianwz2/bubbleformer_modify/bubbleformer/bubbleformer_logs/Same_size_shared_experts_E_6_S_1_A_2_avit_moe_poolboiling_combined_36342187/epoch_399_outputs"
     else:  # avit
         model_kwargs = {
             "fields": 4,
@@ -63,11 +91,29 @@ def run_inference(model_type, dataset_name):
             "num_heads": 6,
             "drop_path": 0.2
         }
-        weights_path = "/share/crsp/lab/ai4ts/xianwz2/bubbleformer_modify/bubbleformer/bubbleformer_logs/Modified_Combined_avit_poolboiling_combined_36188451/lightning_logs/version_0/checkpoints/epoch=399-step=200000.ckpt"
-        save_dir_base = "/share/crsp/lab/amowli/xianwz2/bubbleformer_modify/bubbleformer/bubbleformer_logs/Modified_Combined_avit_poolboiling_combined_36188451/epoch_399_outputs"
+        # Default paths for avit model
+        default_weights_path = "/share/crsp/lab/amowli/xianwz2/bubbleformer_modify/bubbleformer/bubbleformer_logs/Same_size_shared_experts_E_6_S_1_A_2_avit_moe_poolboiling_combined_36342187/lightning_logs/version_0/checkpoints/epoch=341-step=171000.ckpt"
+        default_save_dir_base = "/share/crsp/lab/amowli/xianwz2/bubbleformer_modify/bubbleformer/bubbleformer_logs/Same_size_shared_experts_E_6_S_1_A_2_avit_moe_poolboiling_combined_36342187/epoch_341_outputs"
+    
+    # Use custom paths if provided, otherwise use defaults
+    weights_path = custom_weights_path if custom_weights_path else default_weights_path
+    
+    # Determine save directory: 
+    # 1. Use custom_save_dir if provided
+    # 2. If not provided but custom_weights_path is provided, auto-generate save_dir from weights_path
+    # 3. Otherwise use default_save_dir_base
+    if custom_save_dir:
+        save_dir_base = custom_save_dir
+    elif custom_weights_path:
+        save_dir_base = generate_save_dir_from_weights_path(custom_weights_path)
+    else:
+        save_dir_base = default_save_dir_base
     
     # Set save directory based on dataset
     save_dir = os.path.join(save_dir_base, dataset_name)
+    
+    print(f"Using weights from: {weights_path}")
+    print(f"Saving results to: {save_dir}")
     
     # Create dataset
     test_path = dataset_paths[dataset_name]
@@ -111,6 +157,9 @@ def run_inference(model_type, dataset_name):
     timesteps = []
     
     # Run inference
+    total_start_time = time.time()
+    iteration_times = []
+    
     for itr in range(0, 500, skip_itrs):
         inp, tgt = test_dataset[itr]
         print(f"Autoreg pred {itr}, inp tw [{start_time+itr}, {start_time+itr+skip_itrs}], tgt tw [{start_time+itr+skip_itrs}, {start_time+itr+2*skip_itrs}]")
@@ -119,7 +168,20 @@ def run_inference(model_type, dataset_name):
             inp = model_preds[-1]  # T, C, H, W
             
         inp = inp.float().unsqueeze(0)
+        
+        # Start timing this iteration
+        iter_start_time = time.time()
+        
+        # Run inference
         pred = model(inp)
+        
+        # End timing this iteration
+        iter_end_time = time.time()
+        iter_duration = iter_end_time - iter_start_time
+        iteration_times.append(iter_duration)
+        
+        print(f"Iteration time: {iter_duration:.4f} seconds")
+        
         pred = pred.squeeze(0).detach().cpu()
         tgt = tgt.detach().cpu()
         
@@ -128,6 +190,16 @@ def run_inference(model_type, dataset_name):
         timesteps.append(torch.arange(start_time+itr+skip_itrs, start_time+itr+2*skip_itrs))
         
         print(criterion(pred, tgt))
+    
+    # Calculate total inference time
+    total_end_time = time.time()
+    total_duration = total_end_time - total_start_time
+    avg_iteration_time = sum(iteration_times) / len(iteration_times) if iteration_times else 0
+    
+    print(f"\nInference Performance Summary:")
+    print(f"Total inference time: {total_duration:.4f} seconds")
+    print(f"Average iteration time: {avg_iteration_time:.4f} seconds")
+    print(f"Number of iterations: {len(iteration_times)}")
     
     # Process results
     model_preds = torch.cat(model_preds, dim=0)         # T, C, H, W
@@ -156,6 +228,10 @@ def main():
                         help='Model type: avit, avit_moe, or both (default: both)')
     parser.add_argument('--dataset', type=str, choices=['sat_92', 'subcooled_100', 'grav_0.2', 'all'], default='all',
                         help='Dataset to run inference on (default: all)')
+    parser.add_argument('--weights_path', type=str, default=None,
+                        help='Custom path to model weights checkpoint file (optional)')
+    parser.add_argument('--save_dir', type=str, default=None,
+                        help='Custom base directory to save results (optional)')
     args = parser.parse_args()
     
     # Determine which models to run
@@ -175,7 +251,7 @@ def main():
     # Run inference for each model on each dataset
     for model_type in models_to_run:
         for dataset_name in datasets_to_run:
-            run_inference(model_type, dataset_name)
+            run_inference(model_type, dataset_name, args.weights_path, args.save_dir)
 
 if __name__ == "__main__":
     main()
