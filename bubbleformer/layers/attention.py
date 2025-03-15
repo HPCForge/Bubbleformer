@@ -232,6 +232,9 @@ class AxialAttentionMoEBlock(nn.Module):
         n_experts (int): Number of experts
         n_shared_experts (int): Number of shared experts
         top_k (int): Number of activated experts to use
+        routed_expert_embed_dim (int): Dimension for routed expert MLP hidden layer
+        shared_expert_type (str): Type of shared expert MLP ('gelu' or 'siren')
+        shared_expert_embed_dim (int): Dimension for shared expert MLP hidden layer
     """
     def __init__(
         self,
@@ -243,6 +246,9 @@ class AxialAttentionMoEBlock(nn.Module):
         n_experts=6,
         n_shared_experts=1,
         top_k=2,
+        routed_expert_embed_dim=None,
+        shared_expert_type="gelu",
+        shared_expert_embed_dim=None,
     ):
         super().__init__()
         self.num_heads = num_heads
@@ -275,9 +281,20 @@ class AxialAttentionMoEBlock(nn.Module):
             self.rel_pos_bias = RelativePositionBias(n_heads=num_heads)
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
-        # self.mlp = GeluMLP(embed_dim)
-        # 28.1 M parameters with 6 router experts, 1 shared expert
-        self.moe = MoE(embed_dim, embed_dim // 2, n_routed_experts=n_experts, n_shared_experts=n_shared_experts, top_k=top_k)
+        # Use routed_expert_embed_dim if provided, otherwise default to embed_dim // 2
+        if routed_expert_embed_dim is None:
+            routed_expert_embed_dim = embed_dim // 2
+            
+        # Use the new parameters
+        self.moe = MoE(
+            embed_dim, 
+            routed_expert_embed_dim, 
+            n_routed_experts=n_experts, 
+            n_shared_experts=n_shared_experts, 
+            top_k=top_k,
+            shared_expert_type=shared_expert_type,
+            shared_expert_inter_dim=shared_expert_embed_dim
+        )
         self.mlp_norm = nn.InstanceNorm2d(embed_dim, affine=True)
 
     def forward(self, x):
@@ -350,7 +367,6 @@ class AxialAttentionMoEBlock(nn.Module):
         # MLP
         inp = x.clone()
         x = rearrange(x, "bt c h w -> bt h w c")
-        # x = self.mlp(x)
         x = self.moe(x)
         x = rearrange(x, "bt h w c -> bt c h w")
         x = self.mlp_norm(x)

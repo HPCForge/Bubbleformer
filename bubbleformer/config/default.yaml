@@ -8,9 +8,10 @@ devices: 1
 max_epochs: 400
 batch_size: 4
 
-checkpoint_path:
+# checkpoint_path: ./bubbleformer_logs/Same_size_shared_experts_E_6_S_1_A_2_avit_moe_poolboiling_combined_36342187/lightning_logs/version_0/checkpoints/epoch=341-step=171000.ckpt
+checkpoint_path: 
 
-use_wandb: True
+use_wandb: Trudde
 wandb_tags:
   - baseline
   - relative_l2_loss

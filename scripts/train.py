@@ -12,6 +12,7 @@ from lightning import seed_everything, Trainer
 from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.callbacks import ModelSummary, Callback
 from lightning.pytorch.plugins.environments import SLURMEnvironment
+from lightning.pytorch.strategies import DDPStrategy
 
 from bubbleformer.data import BubblemlForecast
 from bubbleformer.modules import ForecastModule
@@ -79,8 +80,17 @@ def main(cfg: DictConfig) -> None:
 
     if params["checkpoint_path"] is None:
         log_id = (
-            # "Combined_" +
-            "Modified_Test_" +
+            # "Modified_Combined_torchcompiled" +
+            # "Modified_Test_" +
+            # "Test5_Counter_Test_" +
+            # "Saturated_MPP_baseline_" +
+            "Full_epoch_small_experts_" +
+            "E_" + str(cfg.model_cfg.params.n_experts) + "_" +
+            "S_" + str(cfg.model_cfg.params.n_shared_experts) + "_" +
+            "A_" + str(cfg.model_cfg.params.top_k) + "_" +
+            "RED_" + str(cfg.model_cfg.params.routed_expert_embed_dim) + "_" +
+            "ST_" + str(cfg.model_cfg.params.shared_expert_type) + "_" +
+            "SED_" + str(cfg.model_cfg.params.shared_expert_embed_dim) + "_" +
             cfg.model_cfg.name.lower() + "_"
             + cfg.data_cfg.dataset.lower() + "_"
             + os.getenv("SLURM_JOB_ID")
@@ -89,9 +99,24 @@ def main(cfg: DictConfig) -> None:
         os.makedirs(params["log_dir"], exist_ok=True)
         preempt_ckpt_path = params["log_dir"] + "/hpc_ckpt_1.ckpt"
     else:
-        log_id = cfg.checkpoint_path.split("/")[-2]
-        params["log_dir"] = "/".join(cfg.checkpoint_path.split("/")[:-1])
-        preempt_ckpt_num = int(cfg.checkpoint_path.split("_")[-1][:-5]) + 1
+        # Extract the log_id from the checkpoint path
+        # Handle both custom checkpoints and Lightning checkpoints
+        checkpoint_parts = cfg.checkpoint_path.split("/")
+        if "lightning_logs" in cfg.checkpoint_path:
+            # This is a Lightning checkpoint
+            log_id = checkpoint_parts[-5]  # Adjust based on your path structure
+            params["log_dir"] = "/".join(cfg.checkpoint_path.split("/")[:-4])
+            preempt_ckpt_num = 1  # Start with a new preemption checkpoint number
+        else:
+            # This is a custom checkpoint (hpc_ckpt)
+            log_id = checkpoint_parts[-2]
+            params["log_dir"] = "/".join(cfg.checkpoint_path.split("/")[:-1])
+            try:
+                preempt_ckpt_num = int(cfg.checkpoint_path.split("_")[-1][:-5]) + 1
+            except ValueError:
+                # If we can't parse the number, just use a new number
+                preempt_ckpt_num = 1
+        
         preempt_ckpt_path = params["log_dir"] + "/hpc_ckpt_" + str(preempt_ckpt_num) + ".ckpt"
 
     logger = CSVLogger(save_dir=params["log_dir"])
@@ -137,17 +162,35 @@ def main(cfg: DictConfig) -> None:
                 normalization_constants=(diff_term, div_term),
             )
 
+    # trainer = Trainer(
+    #     accelerator="gpu",
+    #     devices=cfg.devices,
+    #     num_nodes=cfg.nodes,
+    #     strategy="ddp",
+    #     max_epochs=cfg.max_epochs,
+    #     logger=logger,
+    #     default_root_dir=params["log_dir"],
+    #     plugins=[SLURMEnvironment(requeue_signal=signal.SIGHUP)],
+    #     enable_model_summary=True,
+    #     limit_train_batches=500,
+    #     limit_val_batches=50,
+    #     num_sanity_val_steps=0,
+    #     callbacks=[ModelSummary(max_depth=-1), PreemptionCheckpointCallback(preempt_ckpt_path)]
+    # )
+    
+    # for with MoE
     trainer = Trainer(
         accelerator="gpu",
         devices=cfg.devices,
         num_nodes=cfg.nodes,
-        strategy="ddp",
+        # strategy="ddp",
+        strategy=DDPStrategy(find_unused_parameters=True),
         max_epochs=cfg.max_epochs,
         logger=logger,
         default_root_dir=params["log_dir"],
         plugins=[SLURMEnvironment(requeue_signal=signal.SIGHUP)],
         enable_model_summary=True,
-        limit_train_batches=500,
+        # limit_train_batches=500,
         limit_val_batches=50,
         num_sanity_val_steps=0,
         callbacks=[ModelSummary(max_depth=-1), PreemptionCheckpointCallback(preempt_ckpt_path)]

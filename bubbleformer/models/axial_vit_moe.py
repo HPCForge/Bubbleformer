@@ -16,6 +16,12 @@ class SpaceTimeBlock(nn.Module):
         embed_dim (int): Number of features in the input tensor
         num_heads (int): Number of attention heads
         drop_path (float): Drop path rate
+        n_experts (int): Number of experts
+        n_shared_experts (int): Number of shared experts
+        top_k (int): Number of activated experts to use
+        routed_expert_embed_dim (int): Dimension for routed expert MLP hidden layer
+        shared_expert_type (str): Type of shared expert MLP ('gelu' or 'siren')
+        shared_expert_embed_dim (int): Dimension for shared expert MLP hidden layer
     """
     def __init__(
         self,
@@ -25,6 +31,9 @@ class SpaceTimeBlock(nn.Module):
         n_experts: int = 6,
         n_shared_experts: int = 1,
         top_k: int = 2,
+        routed_expert_embed_dim: int = None,
+        shared_expert_type: str = "gelu",
+        shared_expert_embed_dim: int = None,
     ):
         super().__init__()
 
@@ -35,6 +44,9 @@ class SpaceTimeBlock(nn.Module):
             n_experts=n_experts,
             n_shared_experts=n_shared_experts,
             top_k=top_k,
+            routed_expert_embed_dim=routed_expert_embed_dim,
+            shared_expert_type=shared_expert_type,
+            shared_expert_embed_dim=shared_expert_embed_dim,
         )
         self.temporal = TemporalAttentionBlock(embed_dim, num_heads, drop_path=drop_path)
 
@@ -74,6 +86,9 @@ class AViTMoE(nn.Module):
         n_experts (int): Number of experts
         n_shared_experts (int): Number of shared experts
         top_k (int): Number of activated experts to use
+        routed_expert_embed_dim (int): Dimension for routed expert MLP hidden layer
+        shared_expert_type (str): Type of shared expert MLP ('gelu' or 'siren')
+        shared_expert_embed_dim (int): Dimension for shared expert MLP hidden layer
     """
     def __init__(
         self,
@@ -86,7 +101,10 @@ class AViTMoE(nn.Module):
         drop_path: int = 0.2,
         n_experts: int = 6,
         n_shared_experts: int = 1,
-        top_k: int = 2
+        top_k: int = 2,
+        routed_expert_embed_dim: int = None,
+        shared_expert_type: str = "gelu",
+        shared_expert_embed_dim: int = None,
     ):
         super().__init__()
         self.drop_path = drop_path
@@ -107,6 +125,9 @@ class AViTMoE(nn.Module):
                     n_experts=n_experts,
                     n_shared_experts=n_shared_experts,
                     top_k=top_k,
+                    routed_expert_embed_dim=routed_expert_embed_dim,
+                    shared_expert_type=shared_expert_type,
+                    shared_expert_embed_dim=shared_expert_embed_dim,
                 )
                 for i in range(processor_blocks)
             ]

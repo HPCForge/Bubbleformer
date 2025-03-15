@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import wandb
+from .linear_layers import GeluMLP, SirenMLP
 
 # # SwiGLU MLP
 # class MLP(nn.Module):
@@ -99,15 +100,32 @@ class Gate(nn.Module):
         return top_k_values, top_k_indices  # (batch_size * height * width, top_k), (batch_size * height * width, top_k)
 
 class MoE(nn.Module):
-    def __init__(self, hidden_dim, inter_dim, n_routed_experts=4, n_shared_experts=1, top_k=2):
+    def __init__(
+        self, 
+        hidden_dim, 
+        routed_expert_inter_dim, 
+        n_routed_experts=4, 
+        n_shared_experts=1, 
+        top_k=2, 
+        shared_expert_type="gelu",
+        shared_expert_inter_dim=None
+    ):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.n_routed_experts = n_routed_experts
         self.top_k = top_k
         self.gate = Gate(hidden_dim, n_routed_experts, top_k)
-        self.experts = nn.ModuleList([Expert(hidden_dim, inter_dim) for _ in range(n_routed_experts)])
-        # self.shared_experts = MLP(hidden_dim, n_shared_experts * inter_dim)
-        self.shared_experts = MLP(hidden_dim, inter_dim)
+        self.experts = nn.ModuleList([Expert(hidden_dim, routed_expert_inter_dim) for _ in range(n_routed_experts)])
+        
+        # If shared_expert_inter_dim is not provided, use the same as routed_expert_inter_dim
+        if shared_expert_inter_dim is None:
+            shared_expert_inter_dim = routed_expert_inter_dim
+        
+        # Choose shared expert type based on parameter
+        if shared_expert_type.lower() == "siren":
+            self.shared_experts = SirenMLP(hidden_dim, inter_dim=shared_expert_inter_dim)
+        else:  # default to GeluMLP
+            self.shared_experts = GeluMLP(hidden_dim, inter_dim=shared_expert_inter_dim)
         
         # Add tracking variables
         self.tracking_enabled = False
@@ -231,7 +249,7 @@ class MoETracker:
                     total += counts
         return total
     
-    def plot_distribution(self, log_wandb=False):
+    def plot_distribution(self, log_wandb=False, epoch=None):
         """Plot token distribution across experts for each layer and in total"""
         if not self.is_tracking:
             return None
@@ -253,34 +271,67 @@ class MoETracker:
         # Plot individual layer distributions
         for i, (counts, name) in enumerate(zip(layer_counts, self.layer_names)):
             counts_np = counts.cpu().numpy()
-            df = pd.DataFrame({
-                'Expert ID': pd.Series(range(len(counts_np))).astype(int),
-                'Token Count': counts_np
-            })
+            expert_ids = np.arange(len(counts_np))
             
-            sns.barplot(x='Expert ID', y='Token Count', data=df, ax=axes[i])
-            axes[i].set_title(f"Layer: {name}")
+            axes[i].bar(expert_ids, counts_np)
+            axes[i].set_title(f"Epoch {epoch} - Layer: {name}")
             axes[i].set_xlabel("Expert ID")
             axes[i].set_ylabel("Token Count")
-        
+            # Ensure integer ticks
+            axes[i].set_xticks(expert_ids)
+
         # Plot total distribution
         total_np = total_counts.cpu().numpy()
-        df = pd.DataFrame({
-            'Expert ID': pd.Series(range(len(total_np))).astype(int),
-            'Token Count': total_np
-        })
-        
-        sns.barplot(x='Expert ID', y='Token Count', data=df, ax=axes[-1])
-        axes[-1].set_title("Total Across All Layers")
+        expert_ids = np.arange(len(total_np))
+
+        axes[-1].bar(expert_ids, total_np)
+        axes[-1].set_title(f"Epoch {epoch} - Total Across All Layers")
         axes[-1].set_xlabel("Expert ID")
         axes[-1].set_ylabel("Token Count")
+        axes[-1].set_xticks(expert_ids)
         
         plt.tight_layout()
         
         if log_wandb:
-            wandb.log({"Expert Token Distribution": wandb.Image(fig)})
+            # Create a log dictionary with the epoch if provided
+            log_data = {"Expert Token Distribution": wandb.Image(fig)}
+            if epoch is not None:
+                log_data["epoch"] = epoch
+            wandb.log(log_data)
         
         return fig
+    
+    def log_distribution_data(self, log_wandb=False, epoch=None):
+        """Log token distribution data numerically to wandb"""
+        if not self.is_tracking or not log_wandb:
+            return None
+        
+        layer_counts = self.get_layer_counts()
+        total_counts = self.get_total_counts()
+        
+        if layer_counts is None or total_counts is None:
+            return None
+        
+        # Create a dictionary to hold all the data
+        log_data = {}
+        
+        # Log individual layer distributions
+        for i, (counts, name) in enumerate(zip(layer_counts, self.layer_names)):
+            counts_np = counts.cpu().numpy()
+            for expert_id, count in enumerate(counts_np):
+                log_data[f"expert_counts/{name}/expert_{expert_id}"] = count
+        
+        # Log total distribution
+        total_np = total_counts.cpu().numpy()
+        for expert_id, count in enumerate(total_np):
+            log_data[f"expert_counts/total/expert_{expert_id}"] = count
+        
+        # Add epoch if provided
+        if epoch is not None:
+            log_data["epoch"] = epoch
+        
+        # Log all data at once
+        wandb.log(log_data)
 
 # Example usage during inference
 def inference_with_tracking(model, input_data):
