@@ -102,6 +102,22 @@ def print_model_stats(model):
     print(f"Activation Ratio: {activated_params/total_params:.2%}")
     
     if moe_stats["total_moe_layers"] > 0:
+        # Calculate total MoE statistics
+        total_moe_params = sum(layer['params_per_expert'] * layer['n_experts'] + 
+                               layer['gate_params'] + 
+                               layer['shared_expert_params'] 
+                               for layer in moe_stats["layers"])
+        
+        # Use the sum of activated parameters from each MoE layer
+        total_activated_moe_params = sum(layer['activated_params'] for layer in moe_stats["layers"])
+        
+        # Print total MoE statistics
+        print("\nTotal MoE Statistics:")
+        print(f"  Total MoE Parameters: {total_moe_params:,}")
+        print(f"  Total Activated MoE Parameters: {total_activated_moe_params:,}")
+        print(f"  MoE Activation Ratio: {total_activated_moe_params/total_moe_params:.2%}")
+        print(f"  MoE Parameters % of Model: {total_moe_params/total_params:.2%}")
+        
         print("\nMixture of Experts (MoE) Layers:")
         print("-"*80)
         
@@ -114,4 +130,4 @@ def print_model_stats(model):
             print(f"  Expert activation ratio: {layer['activation_ratio']:.2%}")
             print(f"  Activated parameters: {layer['activated_params']:,}")
     
-    print("\n" + "="*80) 
+    print("\n" + "="*80)
