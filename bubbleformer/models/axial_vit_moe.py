@@ -63,7 +63,7 @@ class SpaceTimeBlock(nn.Module):
         x = self.temporal(x)    # (B, T, C, H, W)
 
         # Now do spatial attention
-        x = rearrange(x, "b t c h w -> (b t) c h w")        # BT sequences
+        # x = rearrange(x, "b t c h w -> (b t) c h w")        # BT sequences
         x = self.spatial(x)                                 # A spatial encoder block
         x = rearrange(x, "(b t) c h w -> b t c h w", t=t)
 

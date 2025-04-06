@@ -300,11 +300,14 @@ class AxialAttentionMoEBlock(nn.Module):
     def forward(self, x):
         """
         Args:
-            x (torch.Tensor): Input tensor of shape (BT, C, H, W)
+            x (torch.Tensor): Input tensor of shape (B, T, C, H, W)
         Returns:
             torch.Tensor: Output tensor of shape (BT, C, H, W)
         """
-        _, _, h, w = x.shape
+        b, t, _, h, w = x.shape # X Shape: (B, T, C, H, W) -> [4, 5, 384, 32, 32]
+        
+        x = rearrange(x, "b t c h w -> (b t) c h w") # X Shape: (BT, C, H, W) -> [20, 384, 32, 32]
+        
         inp = x.clone()
         x = self.norm1(x)
         x = self.input_head(x)
@@ -366,9 +369,12 @@ class AxialAttentionMoEBlock(nn.Module):
 
         # MLP
         inp = x.clone()
-        x = rearrange(x, "bt c h w -> bt h w c")
-        x = self.moe(x)
-        x = rearrange(x, "bt h w c -> bt c h w")
+        # X Shape: [20, 384, 32, 32] -> [20, 32, 32, 384]
+        # x = rearrange(x, "bt c h w -> bt h w c")
+        x = rearrange(x, "(b t) c h w -> b t h w c", b=b, t=t) # X Shape: [20, 384, 32, 32] -> [4, 5, 32, 32, 384]
+        x = self.moe(x) 
+        # x = rearrange(x, "bt h w c -> bt c h w")
+        x = rearrange(x, "b t h w c -> (b t) c h w")
         x = self.mlp_norm(x)
         out = inp + self.drop_path(self.gamma_mlp[None, :, None, None] * x)
 

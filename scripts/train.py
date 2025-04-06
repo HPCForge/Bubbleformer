@@ -16,6 +16,7 @@ from lightning.pytorch.strategies import DDPStrategy
 
 from bubbleformer.data import BubblemlForecast
 from bubbleformer.modules import ForecastModule
+from bubbleformer.utils.param_counter import print_model_stats
 
 def is_leader_process():
     """
@@ -78,19 +79,22 @@ def main(cfg: DictConfig) -> None:
     params["optim_cfg"] =  cfg.optim_cfg
     params["scheduler_cfg"] =  cfg.scheduler_cfg
 
+    # if cfg.max_epochs<=400, set Full epoch flag to empty string, else set to "Full_epoch_"
+    full_epoch_flag = "" if cfg.max_epochs <= 400 else "Full_epoch_"
+    
     if params["checkpoint_path"] is None:
         log_id = (
             # "Modified_Combined_torchcompiled" +
             # "Modified_Test_" +
             # "Test5_Counter_Test_" +
             # "Saturated_MPP_baseline_" +
-            "Full_epoch_small_experts_" +
+            full_epoch_flag +
+            "RED_" + str(cfg.model_cfg.params.routed_expert_embed_dim) + "_" +
+            "SED_" + str(cfg.model_cfg.params.shared_expert_embed_dim) + "_" +
+            "ST_" + str(cfg.model_cfg.params.shared_expert_type) + "_" +
             "E_" + str(cfg.model_cfg.params.n_experts) + "_" +
             "S_" + str(cfg.model_cfg.params.n_shared_experts) + "_" +
             "A_" + str(cfg.model_cfg.params.top_k) + "_" +
-            "RED_" + str(cfg.model_cfg.params.routed_expert_embed_dim) + "_" +
-            "ST_" + str(cfg.model_cfg.params.shared_expert_type) + "_" +
-            "SED_" + str(cfg.model_cfg.params.shared_expert_embed_dim) + "_" +
             cfg.model_cfg.name.lower() + "_"
             + cfg.data_cfg.dataset.lower() + "_"
             + os.getenv("SLURM_JOB_ID")
@@ -162,6 +166,9 @@ def main(cfg: DictConfig) -> None:
                 normalization_constants=(diff_term, div_term),
             )
 
+    # Print model parameter statistics
+    print_model_stats(train_module.model)
+
     # trainer = Trainer(
     #     accelerator="gpu",
     #     devices=cfg.devices,
@@ -190,7 +197,7 @@ def main(cfg: DictConfig) -> None:
         default_root_dir=params["log_dir"],
         plugins=[SLURMEnvironment(requeue_signal=signal.SIGHUP)],
         enable_model_summary=True,
-        # limit_train_batches=500,
+        limit_train_batches=50,
         limit_val_batches=50,
         num_sanity_val_steps=0,
         callbacks=[ModelSummary(max_depth=-1), PreemptionCheckpointCallback(preempt_ckpt_path)]

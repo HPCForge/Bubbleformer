@@ -8,6 +8,8 @@ import seaborn as sns
 import pandas as pd
 import wandb
 from .linear_layers import GeluMLP, SirenMLP
+from einops import rearrange
+
 
 # # SwiGLU MLP
 # class MLP(nn.Module):
@@ -93,7 +95,7 @@ class Gate(nn.Module):
         self.weight = nn.Parameter(torch.randn(n_routed_experts, hidden_dim))
     
     def forward(self, x):
-        # x shape: (batch_size * height * width, hidden_dim)
+        # x shape: (batch_size * time_window * height * width, hidden_dim)
         scores = F.softmax(F.linear(x, self.weight), dim=-1)
         top_k_values, top_k_indices = torch.topk(scores, self.top_k, dim=-1)
         top_k_values /= top_k_values.sum(dim=-1, keepdim=True)  # Normalize weights
@@ -152,14 +154,19 @@ class MoE(nn.Module):
             self.expert_token_counts.zero_()
         
     def forward(self, x):
-        batch_size, height, width, hidden_dim = x.shape # X Shape: (batch_size, height, width, hidden_dim)
+        # batch_size, height, width, hidden_dim = x.shape # X Shape: (batch_size, height, width, hidden_dim)
+        batch_size, time_window, height, width, hidden_dim = x.shape
         
         # if self.training:
-        #     print("TRAINING - x shape: ", x.shape) # torch.Size([20, 32, 32, 384])
+        #     print("TRAINING - x shape: ", x.shape) # torch.Size([4, 5, 32, 32, 384])
         # else:
-        #     print("VALIDATION - x shape: ", x.shape) # torch.Size([20, 32, 32, 384])
+        #     print("VALIDATION - x shape: ", x.shape) # torch.Size([4, 5, 32, 32, 384])
         
-        x = x.contiguous().reshape(-1, hidden_dim)  # X Shape: (batch_size * height * width, hidden_dim))
+        # x = x.contiguous().reshape(-1, hidden_dim)  # X Shape: (batch_size * height * width, hidden_dim))
+        # Using rearrange instead of reshape
+        # equivalent to x.reshape(-1, hidden_dim)
+        # x = rearrange(x, "b h w d -> (b h w) d")   # X Shape: (batch_size * height * width, hidden_dim))
+        x = rearrange(x, "b t h w d -> (b t h w) d") # X Shape: (batch_size * time_window * height * width, hidden_dim))
         
         weights, indices = self.gate(x)  # Weights Shape: (batch_size * height * width, topk)
         
@@ -183,7 +190,8 @@ class MoE(nn.Module):
             idx, top = torch.where(indices == i)
             output[idx] += expert(x[idx]) * weights[idx, top, None]
         shared_expert_output = self.shared_experts(x)
-        return (output + shared_expert_output).view(batch_size, height, width, hidden_dim)  # Reshape back to original form
+        # return (output + shared_expert_output).view(batch_size, height, width, hidden_dim)  # Reshape back to original form
+        return (output + self.shared_experts(x)).view(batch_size, time_window, height, width, hidden_dim)  # Update this line
 
 class MoETracker:
     """
