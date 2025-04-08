@@ -9,5 +9,5 @@ params:
   n_shared_experts: 1
   top_k: 2
   routed_expert_embed_dim: 192
-  shared_expert_type: "siren"  # Options: "gelu" or "siren"
-  shared_expert_embed_dim: 768  # Larger dimension for shared expert
+  shared_expert_type: "gelu"  # Options: "gelu" or "siren"
+  shared_expert_embed_dim: 384  # Larger dimension for shared expert

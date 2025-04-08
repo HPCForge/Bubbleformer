@@ -113,9 +113,20 @@ class ForecastModule(L.LightningModule):
         batch: Tuple[torch.Tensor, torch.Tensor],
         batch_idx: int
     ) -> torch.Tensor:
+        # Check if this is the last batch in this validation epoch
+        is_last_batch = (batch_idx == self.trainer.num_val_batches[0] - 1)
+        
+        # Set last batch flag for MoE layers if this is the last batch
+        if is_last_batch:
+            self.moe_tracker.set_last_batch_flag(True)
+        else:
+            self.moe_tracker.set_last_batch_flag(False)
+        
+        # Process batch as usual
         inp, tgt = batch
         pred = self.model(inp)
         loss = self.criterion(pred, tgt)
+        
         if batch_idx == 0:
             self.validation_sample = (inp.detach(), tgt.detach(), pred.detach())
 
@@ -189,6 +200,9 @@ class ForecastModule(L.LightningModule):
         # Enable MoE tracking for validation
         self.moe_tracker.enable_tracking()
         self.moe_tracker.reset_counts()
+        
+        # Enable heatmap generation for validation with current epoch
+        self.moe_tracker.enable_heatmap_generation(epoch=self.current_epoch)
 
     def on_validation_epoch_end(self):
         if self.val_start_time is not None:
@@ -208,6 +222,9 @@ class ForecastModule(L.LightningModule):
         
         # Disable MoE tracking after validation
         self.moe_tracker.disable_tracking()
+        
+        # Disable heatmap generation after validation
+        self.moe_tracker.disable_heatmap_generation()
         
         fields = self.data_cfg["fields"]
         if self.validation_sample is None:
