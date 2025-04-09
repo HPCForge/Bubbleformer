@@ -174,19 +174,19 @@ class MoE(nn.Module):
         if self.expert_token_counts is not None:
             self.expert_token_counts.zero_()
         
-    def generate_similarity_heatmaps(self, scores, batch_size, time_window, height, width):
+    def generate_similarity_heatmaps(self, output_vectors, batch_size, time_window, height, width):
         """
         Generate heatmaps showing cosine similarity to center vector for each patch
         
         Args:
-            scores: Expert scores of shape (batch_size * time_window * height * width, n_routed_experts)
+            output_vectors: Expert outputs of shape (batch_size * time_window * height * width, hidden_dim)
             batch_size, time_window, height, width: Dimensions of original input
             
         Returns:
             A figure with batch_size * time_window heatmaps arranged in a grid
         """
-        # Reshape scores to match original dimensions
-        scores = scores.reshape(batch_size, time_window, height, width, self.n_routed_experts)
+        # Reshape output vectors to match original dimensions
+        output_vectors = output_vectors.reshape(batch_size, time_window, height, width, self.hidden_dim)
         
         # Calculate center indices
         center_h, center_w = height // 2, width // 2
@@ -200,13 +200,13 @@ class MoE(nn.Module):
         for b in range(batch_size):
             for t in range(time_window):
                 # Get the center vector as reference
-                center_vector = scores[b, t, center_h, center_w]
+                center_vector = output_vectors[b, t, center_h, center_w]
                 
                 # Calculate cosine similarity for each position
                 similarities = torch.zeros(height, width)
                 for h in range(height):
                     for w in range(width):
-                        current_vector = scores[b, t, h, w]
+                        current_vector = output_vectors[b, t, h, w]
                         similarity = F.cosine_similarity(center_vector.unsqueeze(0), 
                                                         current_vector.unsqueeze(0), 
                                                         dim=1)
@@ -245,10 +245,20 @@ class MoE(nn.Module):
         # Generate heatmaps if enabled AND this is the last batch
         heatmap_fig = None
         if self.generate_heatmaps and self.is_last_batch:
-            # Need to get raw scores before softmax for better visualization
+            # Process through experts first to get output
+            counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts).tolist()
+            output = torch.zeros_like(x_flat)  # Placeholder for MoE output
+            
+            for i in range(self.n_routed_experts):
+                if counts[i] == 0:
+                    continue
+                expert = self.experts[i]
+                idx, top = torch.where(indices == i)
+                output[idx] += expert(x_flat[idx]) * weights[idx, top, None]
+                
+            # Now generate heatmaps using the output vectors
             with torch.no_grad():
-                raw_scores = F.linear(x_flat, self.gate.weight)
-                heatmap_fig = self.generate_similarity_heatmaps(raw_scores, batch_size, time_window, height, width)
+                heatmap_fig = self.generate_similarity_heatmaps(output, batch_size, time_window, height, width)
                 
                 # Log to wandb if this is being done during evaluation
                 if not self.training and heatmap_fig is not None:
@@ -259,22 +269,17 @@ class MoE(nn.Module):
                     
                     wandb.log({img_name: wandb.Image(heatmap_fig)})
                     plt.close(heatmap_fig)
-        
-        # Track token distribution if enabled
-        if self.tracking_enabled and self.expert_token_counts is not None:
-            token_counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts)
-            self.expert_token_counts += token_counts.to(self.expert_token_counts.device)
-
-        # Process through experts
-        counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts).tolist() # Shape: (n_routed_experts, )
-        output = torch.zeros_like(x_flat)  # Placeholder for MoE output
-        
-        for i in range(self.n_routed_experts):
-            if counts[i] == 0:
-                continue
-            expert = self.experts[i]
-            idx, top = torch.where(indices == i)
-            output[idx] += expert(x_flat[idx]) * weights[idx, top, None]
+        else:
+            # Process through experts normally
+            counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts).tolist()
+            output = torch.zeros_like(x_flat)  # Placeholder for MoE output
+            
+            for i in range(self.n_routed_experts):
+                if counts[i] == 0:
+                    continue
+                expert = self.experts[i]
+                idx, top = torch.where(indices == i)
+                output[idx] += expert(x_flat[idx]) * weights[idx, top, None]
             
         # Add shared expert output
         shared_expert_output = self.shared_experts(x_flat)
