@@ -10,6 +10,8 @@ import wandb
 from .linear_layers import GeluMLP, SirenMLP
 from einops import rearrange
 import torchvision.utils as vutils
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 
 # # SwiGLU MLP
@@ -136,11 +138,6 @@ class MoE(nn.Module):
         self.tracking_enabled = False
         self.expert_token_counts = None
         
-        # Add heatmap generation flag
-        self.generate_heatmaps = False
-        self.current_epoch = None
-        self.is_last_batch = False
-        
     def enable_tracking(self):
         """Enable tracking of token distribution across experts"""
         self.tracking_enabled = True
@@ -149,19 +146,6 @@ class MoE(nn.Module):
     def disable_tracking(self):
         """Disable tracking of token distribution"""
         self.tracking_enabled = False
-        
-    def enable_heatmap_generation(self, epoch=None):
-        """Enable generation of similarity heatmaps"""
-        self.generate_heatmaps = True
-        self.current_epoch = epoch
-        
-    def disable_heatmap_generation(self):
-        """Disable generation of similarity heatmaps"""
-        self.generate_heatmaps = False
-        
-    def set_last_batch_flag(self, is_last):
-        """Set flag to indicate if this is the last batch"""
-        self.is_last_batch = is_last
         
     def get_token_counts(self):
         """Return the current token counts per expert"""
@@ -174,64 +158,6 @@ class MoE(nn.Module):
         if self.expert_token_counts is not None:
             self.expert_token_counts.zero_()
         
-    def generate_similarity_heatmaps(self, output_vectors, batch_size, time_window, height, width):
-        """
-        Generate heatmaps showing cosine similarity to center vector for each patch
-        
-        Args:
-            output_vectors: Expert outputs of shape (batch_size * time_window * height * width, hidden_dim)
-            batch_size, time_window, height, width: Dimensions of original input
-            
-        Returns:
-            A figure with batch_size * time_window heatmaps arranged in a grid
-        """
-        # Reshape output vectors to match original dimensions
-        output_vectors = output_vectors.reshape(batch_size, time_window, height, width, self.hidden_dim)
-        
-        # Calculate center indices
-        center_h, center_w = height // 2, width // 2
-        
-        # Create a grid figure
-        fig, axes = plt.subplots(batch_size, time_window, 
-                                figsize=(time_window * 3, batch_size * 3),
-                                squeeze=False)
-        
-        # Generate heatmaps for each batch and time step
-        for b in range(batch_size):
-            for t in range(time_window):
-                # Get the center vector as reference
-                center_vector = output_vectors[b, t, center_h, center_w]
-                
-                # Calculate cosine similarity for each position
-                similarities = torch.zeros(height, width)
-                for h in range(height):
-                    for w in range(width):
-                        current_vector = output_vectors[b, t, h, w]
-                        similarity = F.cosine_similarity(center_vector.unsqueeze(0), 
-                                                        current_vector.unsqueeze(0), 
-                                                        dim=1)
-                        similarities[h, w] = similarity.item()
-                
-                # Plot heatmap
-                ax = axes[b, t]
-                sns.heatmap(similarities.cpu().numpy(), 
-                           ax=ax, 
-                           vmin=-1, 
-                           vmax=1, 
-                           cmap='jet',
-                           cbar=(t == time_window-1))
-                
-                ax.set_title(f"Batch {b}, Time {t}")
-                if b == batch_size - 1:
-                    ax.set_xlabel("Width")
-                if t == 0:
-                    ax.set_ylabel("Height")
-                ax.set_xticks([])
-                ax.set_yticks([])
-        
-        plt.tight_layout()
-        return fig
-            
     def forward(self, x):
         # Extract dimensions from input
         batch_size, time_window, height, width, hidden_dim = x.shape
@@ -242,50 +168,31 @@ class MoE(nn.Module):
         # Get weights and indices from gate
         weights, indices = self.gate(x_flat)  # Weights Shape: (batch_size * height * width, topk)
         
-        # Generate heatmaps if enabled AND this is the last batch
-        heatmap_fig = None
-        if self.generate_heatmaps and self.is_last_batch:
-            # Process through experts first to get output
-            counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts).tolist()
-            output = torch.zeros_like(x_flat)  # Placeholder for MoE output
-            
-            for i in range(self.n_routed_experts):
-                if counts[i] == 0:
-                    continue
-                expert = self.experts[i]
-                idx, top = torch.where(indices == i)
-                output[idx] += expert(x_flat[idx]) * weights[idx, top, None]
-                
-            # Now generate heatmaps using the output vectors
-            with torch.no_grad():
-                heatmap_fig = self.generate_similarity_heatmaps(output, batch_size, time_window, height, width)
-                
-                # Log to wandb if this is being done during evaluation
-                if not self.training and heatmap_fig is not None:
-                    epoch_str = f"epoch_{self.current_epoch}" if self.current_epoch is not None else "epoch_unknown"
-                    layer_str = f"layer_{self.layer_idx}" if self.layer_idx is not None else "layer_unknown"
-                    # Use more structured naming to avoid wandb adding indices
-                    img_name = f"similarity_maps/{epoch_str}/{layer_str}"
-                    
-                    wandb.log({img_name: wandb.Image(heatmap_fig)})
-                    plt.close(heatmap_fig)
-        else:
-            # Process through experts normally
-            counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts).tolist()
-            output = torch.zeros_like(x_flat)  # Placeholder for MoE output
-            
-            for i in range(self.n_routed_experts):
-                if counts[i] == 0:
-                    continue
-                expert = self.experts[i]
-                idx, top = torch.where(indices == i)
-                output[idx] += expert(x_flat[idx]) * weights[idx, top, None]
-            
+        # Process through experts normally
+        counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts).tolist()
+        output = torch.zeros_like(x_flat)  # Placeholder for MoE output
+        
+        for i in range(self.n_routed_experts):
+            if counts[i] == 0:
+                continue
+            expert = self.experts[i]
+            idx, top = torch.where(indices == i)
+            output[idx] += expert(x_flat[idx]) * weights[idx, top, None]
+        
+        # Track token counts for experts if tracking is enabled
+        if self.tracking_enabled and not self.training:
+            # Count tokens assigned to each expert
+            expert_counts = torch.bincount(indices.flatten(), minlength=self.n_routed_experts)
+            self.expert_token_counts += expert_counts
+        
         # Add shared expert output
         shared_expert_output = self.shared_experts(x_flat)
         
+        # Combined output from both routed and shared experts
+        combined_output = output + shared_expert_output
+        
         # Reshape back to original form
-        return (output + shared_expert_output).view(batch_size, time_window, height, width, hidden_dim)
+        return combined_output.view(batch_size, time_window, height, width, hidden_dim)
 
 class MoETracker:
     """
@@ -297,7 +204,6 @@ class MoETracker:
         self.layer_names = []
         self._find_moe_layers(model)
         self.is_tracking = False
-        self.generate_heatmaps = False
         
     def _find_moe_layers(self, module, prefix="", layer_counter=None):
         """Recursively find all MoE layers in the model and assign layer indices"""
@@ -325,18 +231,6 @@ class MoETracker:
         for layer in self.moe_layers:
             layer.disable_tracking()
         self.is_tracking = False
-    
-    def enable_heatmap_generation(self, epoch=None):
-        """Enable heatmap generation on all MoE layers"""
-        for layer in self.moe_layers:
-            layer.enable_heatmap_generation(epoch=epoch)
-        self.generate_heatmaps = True
-        
-    def disable_heatmap_generation(self):
-        """Disable heatmap generation on all MoE layers"""
-        for layer in self.moe_layers:
-            layer.disable_heatmap_generation()
-        self.generate_heatmaps = False
     
     def set_last_batch_flag(self, is_last):
         """Set last batch flag on all MoE layers"""

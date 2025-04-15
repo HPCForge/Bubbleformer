@@ -197,12 +197,9 @@ class ForecastModule(L.LightningModule):
             train_loss = self.trainer.callback_metrics["train_loss"].item()
             wandb.log({"train_loss_epoch": train_loss, "epoch": self.current_epoch})
         
-        # Enable MoE tracking for validation
+        # Only enable token counting during validation
         self.moe_tracker.enable_tracking()
         self.moe_tracker.reset_counts()
-        
-        # Enable heatmap generation for validation with current epoch
-        self.moe_tracker.enable_heatmap_generation(epoch=self.current_epoch)
 
     def on_validation_epoch_end(self):
         if self.val_start_time is not None:
@@ -222,9 +219,6 @@ class ForecastModule(L.LightningModule):
         
         # Disable MoE tracking after validation
         self.moe_tracker.disable_tracking()
-        
-        # Disable heatmap generation after validation
-        self.moe_tracker.disable_heatmap_generation()
         
         fields = self.data_cfg["fields"]
         if self.validation_sample is None:
