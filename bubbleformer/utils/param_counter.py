@@ -117,17 +117,18 @@ def print_model_stats(model):
         print(f"  Total Activated MoE Parameters: {total_activated_moe_params:,}")
         print(f"  MoE Activation Ratio: {total_activated_moe_params/total_moe_params:.2%}")
         print(f"  MoE Parameters % of Model: {total_moe_params/total_params:.2%}")
+        print(f"  MoE/MLP Parameters Ratio: {total_activated_moe_params/14_178_816:.2%}")
         
         print("\nMixture of Experts (MoE) Layers:")
         print("-"*80)
         
-        for i, layer in enumerate(moe_stats["layers"]):
-            print(f"\nLayer {i+1}: {layer['name']}")
-            print(f"  Experts: {layer['n_experts']}, Top-k: {layer['top_k']}")
-            print(f"  Parameters per expert: {layer['params_per_expert']:,}")
-            print(f"  Gate parameters: {layer['gate_params']:,}")
-            print(f"  Shared expert parameters: {layer['shared_expert_params']:,}")
-            print(f"  Expert activation ratio: {layer['activation_ratio']:.2%}")
-            print(f"  Activated parameters: {layer['activated_params']:,}")
+        # for i, layer in enumerate(moe_stats["layers"]):
+        #     print(f"\nLayer {i+1}: {layer['name']}")
+        #     print(f"  Experts: {layer['n_experts']}, Top-k: {layer['top_k']}")
+        #     print(f"  Parameters per expert: {layer['params_per_expert']:,}")
+        #     print(f"  Gate parameters: {layer['gate_params']:,}")
+        #     print(f"  Shared expert parameters: {layer['shared_expert_params']:,}")
+        #     print(f"  Expert activation ratio: {layer['activation_ratio']:.2%}")
+        #     print(f"  Activated parameters: {layer['activated_params']:,}")
     
     print("\n" + "="*80)

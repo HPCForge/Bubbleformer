@@ -88,6 +88,8 @@ def main(cfg: DictConfig) -> None:
             # "Modified_Test_" +
             # "Test5_Counter_Test_" +
             # "Saturated_MPP_baseline_" +
+            # "8_" +
+            "Test_" +
             full_epoch_flag +
             "RED_" + str(cfg.model_cfg.params.routed_expert_embed_dim) + "_" +
             "SED_" + str(cfg.model_cfg.params.shared_expert_embed_dim) + "_" +
@@ -167,7 +169,7 @@ def main(cfg: DictConfig) -> None:
             )
 
     # Print model parameter statistics
-    print_model_stats(train_module.model)
+    # print_model_stats(train_module.model)
 
     # trainer = Trainer(
     #     accelerator="gpu",
