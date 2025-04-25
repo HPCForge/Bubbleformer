@@ -5,7 +5,7 @@ from einops import rearrange
 
 from timm.layers import DropPath
 from bubbleformer.layers import GeluMLP, RelativePositionBias, ContinuousPositionBias1D, MoE
-
+from bubbleformer.layers.scattermoe.mlp import MLP
 
 class TemporalAttentionBlock(nn.Module):
     """
@@ -286,15 +286,28 @@ class AxialAttentionMoEBlock(nn.Module):
             routed_expert_embed_dim = embed_dim // 2
             
         # Use the new parameters
-        self.moe = MoE(
-            embed_dim, 
-            routed_expert_embed_dim, 
-            n_routed_experts=n_experts, 
-            n_shared_experts=n_shared_experts, 
+        # self.moe = MoE(
+        #     embed_dim, 
+        #     routed_expert_embed_dim, 
+        #     n_routed_experts=n_experts, 
+        #     n_shared_experts=n_shared_experts, 
+        #     top_k=top_k,
+        #     shared_expert_type=shared_expert_type,
+        #     shared_expert_inter_dim=shared_expert_embed_dim
+        # )
+        
+        # Replace MoE with MLP from scattermoe.mlp
+        self.moe = MLP(
+            input_size=embed_dim, 
+            hidden_size=routed_expert_embed_dim, 
+            num_experts=n_experts,
             top_k=top_k,
-            shared_expert_type=shared_expert_type,
-            shared_expert_inter_dim=shared_expert_embed_dim
+            activation=nn.SiLU() if shared_expert_type == "gelu" else None
         )
+        
+        # Add a router network to generate expert assignments and probabilities
+        self.router = nn.Linear(embed_dim, n_experts)
+        
         self.mlp_norm = nn.InstanceNorm2d(embed_dim, affine=True)
 
     def forward(self, x):
@@ -369,13 +382,35 @@ class AxialAttentionMoEBlock(nn.Module):
 
         # MLP
         inp = x.clone()
-        # X Shape: [20, 384, 32, 32] -> [20, 32, 32, 384]
-        # x = rearrange(x, "bt c h w -> bt h w c")
-        x = rearrange(x, "(b t) c h w -> b t h w c", b=b, t=t) # X Shape: [20, 384, 32, 32] -> [4, 5, 32, 32, 384]
-        x = self.moe(x) 
-        # x = rearrange(x, "bt h w c -> bt c h w")
-        x = rearrange(x, "b t h w c -> (b t) c h w")
-        x = self.mlp_norm(x)
+        
+        # # X Shape: [20, 384, 32, 32] -> [20, 32, 32, 384]
+        # # x = rearrange(x, "bt c h w -> bt h w c")
+        # x = rearrange(x, "(b t) c h w -> b t h w c", b=b, t=t) # X Shape: [20, 384, 32, 32] -> [4, 5, 32, 32, 384]
+        # x = self.moe(x) 
+        # # x = rearrange(x, "bt h w c -> bt c h w")
+        # x = rearrange(x, "b t h w c -> (b t) c h w")
+        # x = self.mlp_norm(x)
+        
+        # Generate routing probabilities and indices
+        x_flat = rearrange(x, "(b t) c h w -> (b t h w) c", b=b, t=t)
+        router_logits = self.router(x_flat)
+        expert_probs, expert_indices = torch.topk(router_logits.softmax(dim=-1), self.moe.top_k, dim=-1)
+        expert_probs = expert_probs / expert_probs.sum(dim=-1, keepdim=True)
+        
+        # Reshape to 5D tensor
+        x = rearrange(x, "(b t) c h w -> b t h w c", b=b, t=t)
+        
+        # Change shape for MLP input
+        x_flat = rearrange(x, "b t h w c -> (b t h w) c")
+        
+        # Pass through MLP with expert probabilities and indices
+        x_out = self.moe(x_flat, expert_probs, expert_indices)
+        
+        # Reshape back to original dimensions
+        x_out = rearrange(x_out, "(b t h w) c -> b t h w c", b=b, t=t, h=h, w=w)
+        x_out = rearrange(x_out, "b t h w c -> (b t) c h w")
+        
+        x = self.mlp_norm(x_out)
         out = inp + self.drop_path(self.gamma_mlp[None, :, None, None] * x)
 
         return out
