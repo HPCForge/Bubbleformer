@@ -7,6 +7,7 @@ import hydra
 import wandb
 from omegaconf import DictConfig
 import torch
+from torch.profiler import profile, record_function, ProfilerActivity
 from torch.utils.data import DataLoader
 from lightning import seed_everything, Trainer
 from lightning.pytorch.loggers import CSVLogger
@@ -31,7 +32,6 @@ def is_leader_process():
             return True
     else:
         return os.getenv("SLURM_PROCID") == "0"
-
 
 class PreemptionCheckpointCallback(Callback):
     """
@@ -126,8 +126,9 @@ def main(cfg: DictConfig) -> None:
         train_dataset,
         batch_size=cfg.batch_size,
         shuffle=True,
-        num_workers=8,
+        num_workers=4,
         pin_memory=True,
+        prefetch_factor=1,
     )
     val_dataloader = DataLoader(
         val_dataset,
@@ -135,6 +136,7 @@ def main(cfg: DictConfig) -> None:
         shuffle=False,
         num_workers=4,
         pin_memory=True,
+        prefetch_factor=1,
     )
     if cfg.data_cfg.return_fluid_params:
         train_module = ConditionedForecastModule(
@@ -156,21 +158,24 @@ def main(cfg: DictConfig) -> None:
             )
 
     trainer = Trainer(
-        accelerator="gpu",
-        devices=cfg.devices,
+        accelerator="gpu",# if cfg.devices > 1 else "cpu",
+        devices=cfg.devices,# if cfg.devices > 0 else 0,
         num_nodes=cfg.nodes,
-        strategy="ddp",
+        strategy="auto",#"ddp" if cfg.devices > 1 else "auto",
         max_epochs=cfg.max_epochs,
+        max_steps=2000, # NOTE: limited for profiling
         logger=logger,
         default_root_dir=params["log_dir"],
         plugins=[SLURMEnvironment(requeue_signal=signal.SIGHUP)],
         enable_model_summary=True,
-        limit_train_batches=1000,
-        limit_val_batches=25,
+        #limit_train_batches=1000,
+        #limit_val_batches=25,
         num_sanity_val_steps=0,
-        callbacks=[ModelSummary(max_depth=-1), PreemptionCheckpointCallback(preempt_ckpt_path)]
+        callbacks=[ModelSummary(max_depth=-1), PreemptionCheckpointCallback(preempt_ckpt_path)],
+        #profiler="pytorch",
+        precision="bf16"
     )
-
+    
     if is_leader_process():
         pp = pprint.PrettyPrinter(depth=4)
         pp.pprint(params)
@@ -194,19 +199,28 @@ def main(cfg: DictConfig) -> None:
             print(e)
             print("Valid wandb API key not found at path bubbleformer/config/wandb_api_key.txt")
 
-    if cfg.checkpoint_path:
-        trainer.fit(
-            train_module,
-            train_dataloaders=train_dataloader,
-            val_dataloaders=val_dataloader,
-            ckpt_path=cfg.checkpoint_path
-        )
-    else:
-        trainer.fit(
-            train_module,
-            train_dataloaders=train_dataloader,
-            val_dataloaders=val_dataloader
-        )
+
+    with profile(
+        activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+        #profile_memory=True,
+        #record_shapes=True,
+    ) as prof:
+        if cfg.checkpoint_path:
+            trainer.fit(
+                train_module,
+                train_dataloaders=train_dataloader,
+                val_dataloaders=val_dataloader,
+                ckpt_path=cfg.checkpoint_path,
+            )
+        else:
+            trainer.fit(
+                train_module,
+                train_dataloaders=train_dataloader,
+                val_dataloaders=val_dataloader,
+            )
+    prof.export_chrome_trace("trace.json")
+    #print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+    #print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
 
     if wandb_run:
         wandb_run.finish()

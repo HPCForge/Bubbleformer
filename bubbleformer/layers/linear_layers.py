@@ -63,15 +63,19 @@ class FiLMMLP(nn.Module):
     def forward(self, x: torch.Tensor, cond) -> torch.Tensor:
         """
         Args:
-            x (torch.Tensor): Input tensor
-            cond (torch.Tensor): Conditioning tensor
+            x (torch.Tensor): Input tensor  (B, T, H, W, C)
+            cond (torch.Tensor): Conditioning tensor (B, param_dim)
         Returns:
             torch.Tensor: Output tensor
         """
+        assert x.shape[0] == cond.shape[0], "Batch size of input and condition must match"
+        batch_size , num_channels = x.shape[0], x.shape[-1]
+        
         gamma_beta = self.film_net(cond)  # (B, 2 * C)
-        gamma, beta = gamma_beta.chunk(2, dim=1)  # each (B, C)
+        gamma, beta = gamma_beta.chunk(2, dim=1)
 
-        gamma = gamma.view(-1, 1, x.shape[2], 1, 1)  # (B, 1, C, 1, 1)
-        beta = beta.view(-1, 1, x.shape[2], 1, 1)
+        # Every (T, H, W) point gets the same embedding.
+        gamma = gamma.view(batch_size, 1, 1, 1, num_channels)  # (B, 1, 1, 1, C)
+        beta = beta.view(batch_size, 1, 1, 1, num_channels)
 
         return gamma * x + beta

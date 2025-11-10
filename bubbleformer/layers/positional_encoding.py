@@ -170,3 +170,22 @@ class RelativePositionBias(nn.Module):
             torch.Tensor: Output tensor of shape (1, n_heads, qlen, klen)
         """
         return self.compute_bias(qlen, klen)  # shape (1, num_heads, qlen, klen)
+
+class CoordinatePosEncoding(nn.Module):
+    def __init__(self, embed_dim: int):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(3, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, embed_dim),
+        )
+    
+    def forward(self, x):
+        _, t, h, w, c = x.shape
+        # This assumes the domain size is always the same.
+        t_coords = torch.linspace(-1, 1, t, device=x.device)
+        h_coords = torch.linspace(-1, 1, h, device=x.device)
+        w_coords = torch.linspace(-1, 1, w, device=x.device)
+        coords = torch.stack(torch.meshgrid(t_coords, h_coords, w_coords, indexing="ij"), dim=-1)
+        encodings = self.mlp(coords)
+        return encodings[None, ...] + x

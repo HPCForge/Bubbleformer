@@ -51,7 +51,7 @@ class ForecastModule(L.LightningModule):
         self.model_cfg["params"]["input_fields"] = len(self.data_cfg["input_fields"])
         self.model_cfg["params"]["output_fields"] = len(self.data_cfg["output_fields"])
         self.model_cfg["params"]["time_window"] = self.data_cfg["time_window"]
-        self.model = get_model(self.model_cfg["name"], **self.model_cfg["params"])
+        self.model = get_model(self.model_cfg["name"], **self.model_cfg["params"]).to(torch.bfloat16)
         #self.model = torch.compile(self.model)
 
         self.save_hyperparameters()
@@ -133,13 +133,15 @@ class ForecastModule(L.LightningModule):
         opt_name = self.optimizer_cfg["name"]
         opt_params = self.optimizer_cfg["params"]
         if opt_name == "adamw":
-            optimizer = AdamW(self.model.parameters(), **opt_params)
+            optimizer = AdamW(self.model.parameters(), **opt_params, fused=True)
         elif opt_name == "adam":
             optimizer = Adam(self.model.parameters(), **opt_params)
         elif opt_name == "lion":
             optimizer = Lion(self.model.parameters(), **opt_params)
         else:
             raise ValueError(f"Optimizer {opt_name} not supported")
+
+        #optimizer = torch.compile(optimizer)
 
         scheduler_name = self.scheduler_cfg["name"]
         scheduler_params = self.scheduler_cfg["params"]

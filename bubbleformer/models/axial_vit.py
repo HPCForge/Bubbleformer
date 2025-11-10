@@ -3,8 +3,10 @@ import torch.nn as nn
 import torch.utils.checkpoint as cp
 import numpy as np
 from einops import rearrange
+from torch.profiler import record_function
 
 from bubbleformer.layers import AxialAttentionBlock, AttentionBlock, HMLPEmbed, HMLPDebed, FiLMMLP
+from bubbleformer.layers.positional_encoding import CoordinatePosEncoding
 from ._api import register_model
 
 __all__ = ["AViT"]
@@ -48,21 +50,21 @@ class SpaceTimeBlock(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args: 
-            x (torch.Tensor): Input tensor of shape (B, T, C, H, W)
+            x (torch.Tensor): Input tensor of shape (B, T, H, W, C)
         Returns:
-            torch.Tensor: Output tensor of shape (B, T, C, H, W)
+            torch.Tensor: Output tensor of shape (B, T, H, W, C)
         """
-        _, t, _, _, _ = x.shape
+        with record_function("space_time_block"):
 
-        # First do temporal attention
-        x = self.temporal(x)    # (B, T, emb, H, W)
+            # Force pytorch to use an actual fast implementaiton.
+            # This has more requirements on head-dim and requires <=16 bit precision.
+            with torch.nn.attention.sdpa_kernel(backends=torch.nn.attention.SDPBackend.FLASH_ATTENTION):
+                with record_function("temporal"):
+                    x = self.temporal(x)
 
-        # Now do spatial attention
-        x = rearrange(x, "b t emb h w -> (b t) emb h w")        # BT sequences
-        x = self.spatial(x)                                 # A spatial encoder block
-        x = rearrange(x, "(b t) emb h w -> b t emb h w", t=t)
-
-        return x    # (B, T, emb, H, W)
+                with record_function("spatial"):
+                    x = self.spatial(x)
+        return x
 
 
 @register_model("avit")
@@ -152,6 +154,7 @@ class AViT(nn.Module):
 
 
 @register_model("filmavit")
+@torch.compile(fullgraph=True)
 class FiLMConditionedAViT(nn.Module):
     """
     FiLM (Feature-wise Linear Modulation) is an expressive and lightweight way to 
@@ -192,9 +195,6 @@ class FiLMConditionedAViT(nn.Module):
         )
 
         self.film_embed = FiLMMLP(num_fluid_params, embed_dim)
-        # self.film_blocks = nn.ModuleList([
-        #     FiLMMLP(num_fluid_params, embed_dim) for _ in range(processor_blocks)
-        # ])
 
         self.dp = np.linspace(0, drop_path, processor_blocks)
         self.blocks = nn.ModuleList([
@@ -213,6 +213,8 @@ class FiLMConditionedAViT(nn.Module):
             embed_dim=embed_dim,
             out_channels=output_fields
         )
+        
+        self.coord_enc = CoordinatePosEncoding(embed_dim)
 
     def forward(self, x: torch.Tensor, fluid_params: torch.Tensor) -> torch.Tensor:
         """
@@ -222,21 +224,35 @@ class FiLMConditionedAViT(nn.Module):
         B, T, _, _, _ = x.shape
 
         # Encode
-        x = rearrange(x, "b t c h w -> (b t) c h w")
-        x = self.embed(x)
-        x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
+        with record_function("encode"):
+            x = rearrange(x, "b t c h w -> (b t) c h w")
+            x = self.embed(x)
+            x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
+
+        # Permute to better order for attention (B, T, H, W, C)
+        # TODO: IDK if input should be in this format for the embedding or not...
+        # I think conv's do support NHWC layout.
+        x = x.permute(0, 1, 3, 4, 2).contiguous()
+        
+        # TODO: This encoding is temporary and assumes the domain size is always the same.
+        with record_function("coord_enc"):
+            x = self.coord_enc(x)
 
         # Apply FiLM conditioning on the embeddings
-        x = self.film_embed(x, fluid_params)  # (B, T, C, H, W)
+        with record_function("film_embed"):
+            x = self.film_embed(x, fluid_params)  # (B, T, H, W, C)
 
-        # Process with FiLM-modulated blocks
-        # for blk, film in zip(self.blocks, self.film_blocks):
-        for blk in self.blocks:
-            x = blk(x)
-            # x = film(x, fluid_params)
+        # Attention blocks
+        for idx, blk in enumerate(self.blocks):
+            with record_function(f"block_{idx}"):
+               x = blk(x)
+
+        # Permute back to (B, T, C, H, W)
+        x = x.permute(0, 1, 4, 2, 3).contiguous()
 
         # Decode
-        x = rearrange(x, "b t c h w -> (b t) c h w")
-        x = self.debed(x)
-        x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
+        with record_function("decode"):
+            x = rearrange(x, "b t c h w -> (b t) c h w")
+            x = self.debed(x)
+            x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
         return x
