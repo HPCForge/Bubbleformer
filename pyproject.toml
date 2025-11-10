@@ -9,9 +9,9 @@ description = "Train Foundational Models om BubbleML"
 authors = [
     { name="Sheikh Md Shakeel Hassan", email="sheikhh1@umd.edu" }
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-    "torch==2.5.0",
+    "torch==2.9.0",
     "torchvision",
     "h5py",
     "hydra-core",
@@ -24,7 +24,7 @@ dependencies = [
     "lightning",
     "wandb",
     "black",
-    "lion-pytorch"
+    "lion-pytorch",
 ]
 
 # Usually stuff is expected to be in `src/bubbleformer/`
@@ -35,22 +35,25 @@ where = ["bubbleformer"]
 torch = [
   # For developing on macos, need cpu torch
   { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
-  { index = "pytorch-cu124", marker = "sys_platform == 'linux'" },
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
 ]
 torchvision = [
   { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
-  { index = "pytorch-cu124", marker = "sys_platform == 'linux'" },
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
 ]
 
 [[tool.uv.index]]
-name = "pytorch-cu124"
-url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.uv]
+no-build-isolation-package = ["flash-attn"]
 
 [tool.black]
 line-length = 100
