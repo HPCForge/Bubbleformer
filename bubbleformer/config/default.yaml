@@ -1,24 +1,25 @@
-log_dir: /pub/sheikhh1/bubbleformer_logs
+log_dir: /pub/afeeney/bubbleformer_logs #/pub/sheikhh1/bubbleformer_logs
 seed: 42
 
-nodes:
-devices:
+nodes: 1
+devices: 1
 
-max_epochs:
-batch_size:
+max_epochs: 1
+batch_size: 4
 
 checkpoint_path:
 
-use_wandb: True
+use_wandb: False
 wandb_tags:
   - time_window-5
   - relative_l2_loss
   - FiLM-AViT-Small
-  - Single_Bubble
-  - Lion_optimizer
+  - singlebubble
+  - AdamW_optimizer
 defaults:
   - _self_
-  - data_cfg: singlebubble
+  - data_cfg: poolboiling_subcooled
+  #- data_cfg: singlebubble
   - model_cfg: film_avit_small
-  - optim_cfg: lion
+  - optim_cfg: adamw
   - scheduler_cfg: cosine_warmup
