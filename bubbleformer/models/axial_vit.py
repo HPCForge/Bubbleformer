@@ -5,7 +5,7 @@ import numpy as np
 from einops import rearrange
 from torch.profiler import record_function
 
-from bubbleformer.layers import AxialAttentionBlock, AttentionBlock, HMLPEmbed, HMLPDebed, FiLMMLP
+from bubbleformer.layers import AxialAttentionBlock, TemporalAttentionBlock, HMLPEmbed, HMLPDebed, FiLMMLP, GeluMLP
 from bubbleformer.layers.positional_encoding import CoordinatePosEncoding
 from ._api import register_model
 
@@ -32,7 +32,10 @@ class SpaceTimeBlock(nn.Module):
     ):
         super().__init__()
 
-        self.temporal = AttentionBlock(
+        self.pre_norm = nn.LayerNorm(embed_dim)
+        self.post_norm = nn.LayerNorm(embed_dim)
+
+        self.temporal = TemporalAttentionBlock(
             embed_dim=embed_dim,
             num_heads=num_heads,
             drop_path=drop_path,
@@ -47,6 +50,8 @@ class SpaceTimeBlock(nn.Module):
             feat_scale=feat_scale,
         )
 
+        self.mlp = GeluMLP(embed_dim)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args: 
@@ -55,15 +60,26 @@ class SpaceTimeBlock(nn.Module):
             torch.Tensor: Output tensor of shape (B, T, H, W, C)
         """
         with record_function("space_time_block"):
-
+            
+            # Attention with a skip connection
+            inp = x.clone()
             # Force pytorch to use an actual fast implementaiton.
             # This has more requirements on head-dim and requires <=16 bit precision.
             with torch.nn.attention.sdpa_kernel(backends=torch.nn.attention.SDPBackend.FLASH_ATTENTION):
                 with record_function("temporal"):
                     x = self.temporal(x)
-
                 with record_function("spatial"):
                     x = self.spatial(x)
+            with record_function("pre_norm"):          
+                x = self.pre_norm(x + inp)
+
+            # MLP with a skip connection
+            intermediate = x.clone()
+            with record_function("mlp"):
+                x = self.mlp(x)
+            with record_function("post_norm"):
+                x = self.post_norm(x + intermediate)
+
         return x
 
 

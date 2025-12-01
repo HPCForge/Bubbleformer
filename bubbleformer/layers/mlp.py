@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-
 class GeluMLP(nn.Module):
     """
     Multi-layer perceptron with a hidden layer and GELU activation
@@ -23,7 +22,6 @@ class GeluMLP(nn.Module):
             torch.Tensor: Output tensor
         """
         return self.fc2(self.act(self.fc1(x)))
-
 
 class SirenMLP(nn.Module):
     """
