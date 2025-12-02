@@ -7,18 +7,18 @@ time_window: 5
 start_time: 10
 return_fluid_params: True
 train_paths:
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-R515B-2D/Twall_13.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-R515B-2D/Twall_15.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-R515B-2D/Twall_17.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-R515B-2D/Twall_19.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-R515B-2D/Twall_21.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-R515B-2D/Twall_23.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_90.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_92.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_94.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_96.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_98.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_100.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-R515B-2D/Twall_13.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-R515B-2D/Twall_15.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-R515B-2D/Twall_17.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-R515B-2D/Twall_19.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-R515B-2D/Twall_21.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-R515B-2D/Twall_23.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-FC72-2D/Twall_90.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-FC72-2D/Twall_92.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-FC72-2D/Twall_94.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-FC72-2D/Twall_96.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-FC72-2D/Twall_98.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-FC72-2D/Twall_100.hdf5
 val_paths:
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_91.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-R515B-2D/Twall_14.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-FC72-2D/Twall_91.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-R515B-2D/Twall_14.hdf5

@@ -5,14 +5,14 @@ normalize: none
 downsample_factor: 1
 time_window: 5
 start_time: 0
-return_fluid_params: False
+return_fluid_params: True
 train_paths:
-  - /share/crsp/lab/amowli/share/Bubbleformer/FlowBoiling-ConstantHeatFlux-FC72-2D/case-13.25pct-chf.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/FlowBoiling-ConstantHeatFlux-FC72-2D/case-22.75pct-chf.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/FlowBoiling-ConstantHeatFlux-FC72-2D/case-33.74pct-chf.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/FlowBoiling-ConstantHeatFlux-FC72-2D/case-77.01pct-chf.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/FlowBoiling-ConstantHeatFlux-FC72-2D/case-86.97pct-chf.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/FlowBoiling-ConstantHeatFlux-FC72-2D/case-13.25pct-chf.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/FlowBoiling-ConstantHeatFlux-FC72-2D/case-22.75pct-chf.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/FlowBoiling-ConstantHeatFlux-FC72-2D/case-33.74pct-chf.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/FlowBoiling-ConstantHeatFlux-FC72-2D/case-77.01pct-chf.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/FlowBoiling-ConstantHeatFlux-FC72-2D/case-86.97pct-chf.hdf5
 val_paths:
-  - /share/crsp/lab/amowli/share/Bubbleformer/FlowBoiling-ConstantHeatFlux-FC72-2D/test-13.25pct-chf.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/FlowBoiling-ConstantHeatFlux-FC72-2D/test-22.75pct-chf.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/FlowBoiling-ConstantHeatFlux-FC72-2D/test-77.01pct-chf.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/FlowBoiling-ConstantHeatFlux-FC72-2D/test-13.25pct-chf.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/FlowBoiling-ConstantHeatFlux-FC72-2D/test-22.75pct-chf.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2/FlowBoiling-ConstantHeatFlux-FC72-2D/test-77.01pct-chf.hdf5

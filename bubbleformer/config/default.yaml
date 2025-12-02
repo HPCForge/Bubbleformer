@@ -1,11 +1,11 @@
-log_dir: /pub/sheikhh1/bubbleformer_logs
+log_dir: ~/Projects/Bubbleformer/temp/bubbleformer_logs/vmamba_film_avit_mini_poolboiling_saturated
 seed: 42
 
-nodes:
-devices:
+nodes: 1
+devices: 1
 
-max_epochs:
-batch_size:
+max_epochs: 250
+batch_size: 1
 
 checkpoint_path:
 
@@ -13,12 +13,12 @@ use_wandb: True
 wandb_tags:
   - time_window-5
   - relative_l2_loss
-  - FiLM-AViT-Small
-  - Single_Bubble
+  - FiLM-AViT-SSM-Mini
+  - Poolboiling-Saturated
   - Lion_optimizer
 defaults:
   - _self_
-  - data_cfg: singlebubble
-  - model_cfg: film_avit_small
+  - data_cfg: poolboiling_saturated
+  - model_cfg: film_avit_ssm_mini
   - optim_cfg: lion
   - scheduler_cfg: cosine_warmup

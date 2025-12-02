@@ -27,3 +27,14 @@ outputs/
 # Wandb API key
 bubbleformer/config/wandb_api_key.txt
 CLAUDE.md
+
+
+#random scripts I have
+/scripts/test.py
+/temp.py
+/temp
+/watch_job.sh
+/models
+/bubbleformer/models/init.sh
+/src
+/s4
