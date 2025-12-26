@@ -163,7 +163,7 @@ def main(cfg: DictConfig) -> None:
         num_nodes=cfg.nodes,
         strategy="auto",#"ddp" if cfg.devices > 1 else "auto",
         max_epochs=cfg.max_epochs,
-        max_steps=2000, # NOTE: limited for profiling
+        #max_steps=200, # NOTE: limited for profiling
         logger=logger,
         default_root_dir=params["log_dir"],
         plugins=[SLURMEnvironment(requeue_signal=signal.SIGHUP)],
@@ -173,7 +173,7 @@ def main(cfg: DictConfig) -> None:
         num_sanity_val_steps=0,
         callbacks=[ModelSummary(max_depth=-1), PreemptionCheckpointCallback(preempt_ckpt_path)],
         #profiler="pytorch",
-        precision="bf16"
+        precision="bf16-mixed"
     )
     
     if is_leader_process():
@@ -199,28 +199,41 @@ def main(cfg: DictConfig) -> None:
             print(e)
             print("Valid wandb API key not found at path bubbleformer/config/wandb_api_key.txt")
 
+    #torch.cuda.memory._record_memory_history(
+    #    max_entries=100000
+    #)
 
-    with profile(
-        activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-        #profile_memory=True,
-        #record_shapes=True,
-    ) as prof:
-        if cfg.checkpoint_path:
-            trainer.fit(
-                train_module,
-                train_dataloaders=train_dataloader,
-                val_dataloaders=val_dataloader,
-                ckpt_path=cfg.checkpoint_path,
-            )
-        else:
-            trainer.fit(
-                train_module,
-                train_dataloaders=train_dataloader,
-                val_dataloaders=val_dataloader,
-            )
-    prof.export_chrome_trace("trace.json")
+    #with profile(
+    #    activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+    #    #record_shapes=True,
+    #    #profile_memory=True,
+    #    with_stack=True,
+    #) as prof:
+    if cfg.checkpoint_path:
+        trainer.fit(
+            train_module,
+            train_dataloaders=train_dataloader,
+            val_dataloaders=val_dataloader,
+            ckpt_path=cfg.checkpoint_path,
+        )
+    else:
+        trainer.fit(
+            train_module,
+            train_dataloaders=train_dataloader,
+            val_dataloaders=val_dataloader,
+        )
+    #prof.export_memory_timeline("memory_timeline.html", device="cuda:0")
+    #prof.export_chrome_trace("trace.json")
     #print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
     #print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+
+    #try:
+    #    torch.cuda.memory._dump_snapshot("memory_snapshot.pickle")
+    #except Exception as e:
+    #    print("failed to capture memory snapshot")
+    #torch.cuda.memory._record_memory_history(
+    #    enabled=None
+    #)
 
     if wandb_run:
         wandb_run.finish()

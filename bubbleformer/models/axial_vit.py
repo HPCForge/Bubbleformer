@@ -5,7 +5,15 @@ import numpy as np
 from einops import rearrange
 from torch.profiler import record_function
 
-from bubbleformer.layers import AxialAttentionBlock, TemporalAttentionBlock, HMLPEmbed, HMLPDebed, FiLMMLP, GeluMLP
+from bubbleformer.layers import (
+    SpatialAxialAttention, 
+    SpatialNeighborhoodAttention, 
+    TemporalAttention, 
+    HMLPEmbed, 
+    HMLPDebed, 
+    FiLMMLP, 
+    GeluMLP
+)
 from bubbleformer.layers.positional_encoding import CoordinatePosEncoding
 from ._api import register_model
 
@@ -35,19 +43,14 @@ class SpaceTimeBlock(nn.Module):
         self.pre_norm = nn.LayerNorm(embed_dim)
         self.post_norm = nn.LayerNorm(embed_dim)
 
-        self.temporal = TemporalAttentionBlock(
+        self.temporal = TemporalAttention(
             embed_dim=embed_dim,
             num_heads=num_heads,
-            drop_path=drop_path,
-            attn_scale=attn_scale,
         )
 
-        self.spatial = AxialAttentionBlock(
+        self.spatial = SpatialNeighborhoodAttention(
             embed_dim=embed_dim,
             num_heads=num_heads,
-            drop_path=drop_path,
-            attn_scale=attn_scale,
-            feat_scale=feat_scale,
         )
 
         self.mlp = GeluMLP(embed_dim)
@@ -170,7 +173,7 @@ class AViT(nn.Module):
 
 
 @register_model("filmavit")
-@torch.compile(fullgraph=True)
+@torch.compile
 class FiLMConditionedAViT(nn.Module):
     """
     FiLM (Feature-wise Linear Modulation) is an expressive and lightweight way to 
@@ -249,10 +252,6 @@ class FiLMConditionedAViT(nn.Module):
         # TODO: IDK if input should be in this format for the embedding or not...
         # I think conv's do support NHWC layout.
         x = x.permute(0, 1, 3, 4, 2).contiguous()
-        
-        # TODO: This encoding is temporary and assumes the domain size is always the same.
-        with record_function("coord_enc"):
-            x = self.coord_enc(x)
 
         # Apply FiLM conditioning on the embeddings
         with record_function("film_embed"):

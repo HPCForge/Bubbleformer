@@ -31,6 +31,9 @@ def plot_bubbleml(
     bnorm = torch.norm(targets, p=2, dim=(2, 3))        # Shape (t, c)
 
     relative_l2_error = diff_norm / bnorm
+    
+    print("L2 error: ", diff_norm)
+    print("Relative L2 error: ", relative_l2_error)
 
     plt.figure(figsize=(10, 6))
     plt.plot(timesteps.numpy(), relative_l2_error[:, 0].numpy(), label="SDF")
@@ -86,6 +89,8 @@ def plot_bubbleml(
         temp_target = targets[i, 1, :, :].numpy()
         temp_err = np.abs(temp_target - temp_pred)/(np.abs(temp_target) + 1.0e-8)
 
+        print(temp_pred.min(), temp_pred.max(), temp_target.min(), temp_target.max())
+
         velx_pred = preds[i, 2, :, :].numpy()
         velx_target = targets[i, 2, :, :].numpy()
         vely_pred = preds[i, 3, :, :].numpy()
@@ -106,20 +111,20 @@ def plot_bubbleml(
 
 
         f, axarr = plt.subplots(2, 3, figsize=(15, 10), layout="constrained")
-        im_00 = axarr[0][0].imshow(sdf_target, vmin=sdf_min, vmax=sdf_max, cmap="Blues", origin="lower")
+        im_00 = axarr[0][0].imshow(sdf_target, cmap="Blues", origin="lower")#vmin=sdf_min, vmax=sdf_max, cmap="Blues", origin="lower")
         axarr[0][0].imshow(target_overlay, alpha=1, origin="lower")
         axarr[0][0].axis("off")
         plt.colorbar(im_00, ax=axarr[0][0], fraction=0.04, pad=0.05)
         axarr[0][0].set_title(f"SDF Label {i}")
 
-        im_01 = axarr[0][1].imshow(temp_target, cmap="turbo", vmin=temp_min, vmax=temp_max, origin="lower")
+        im_01 = axarr[0][1].imshow(temp_target, cmap="turbo", origin="lower")#vmin=temp_min, vmax=temp_max, origin="lower")
         #im_01 = axarr[0][1].imshow(temp_target, cmap="turbo", origin="lower")
         #axarr[0][1].imshow(target_overlay, alpha=1, origin="lower")
         axarr[0][1].axis("off")
         plt.colorbar(im_01, ax=axarr[0, 1], fraction=0.04, pad=0.05)
         axarr[0][1].set_title(f"Temp Label {i}")
 
-        im_02 = axarr[0][2].imshow(np.flipud(velmag_target), vmin=vel_min, vmax=vel_max, cmap="turbo")
+        im_02 = axarr[0][2].imshow(np.flipud(velmag_target), cmap="turbo")#vmin=vel_min, vmax=vel_max, cmap="turbo")
         #im_02 = axarr[0][2].imshow(np.flipud(velmag_target), cmap="turbo")
         axarr[0][2].streamplot(X, Y, np.flipud(velx_target)[10:-10, 10:-10], -np.flipud(vely_target)[10:-10, 10:-10], density=0.75, color="white")
         #axarr[0][2].imshow(np.flipud(target_overlay), alpha=1)
@@ -127,7 +132,7 @@ def plot_bubbleml(
         plt.colorbar(im_02, ax=axarr[0][2], fraction=0.04, pad=0.05)
         axarr[0][2].set_title(f"Vel Label {i}")
 
-        im_10 = axarr[1][0].imshow(sdf_pred, vmin=sdf_min, vmax=sdf_max, cmap="Blues", origin="lower")
+        im_10 = axarr[1][0].imshow(sdf_pred, cmap="Blues", origin="lower")#vmin=sdf_min, vmax=sdf_max, cmap="Blues", origin="lower")
         axarr[1][0].imshow(pred_overlay, alpha=1, origin="lower")
         axarr[1][0].axis("off")
         plt.colorbar(im_10, ax=axarr[1][0], fraction=0.04, pad=0.05)
@@ -169,40 +174,43 @@ def plot_bubbleml(
         )
         plt.close()
         if i % 25 == 0:
-            print(f"{i} files done")
+            print(f"{i}/{preds.shape[0]} files done")
 
 
 
-test_path = ["/share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_91.hdf5"]
+#test_path = ["/share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_91.hdf5"]
+test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-FC72-2D/Twall_97.hdf5"]
 test_dataset = BubbleForecast(
     filenames=test_path,
     input_fields=["dfun", "temperature", "velx", "vely"],
     output_fields=["dfun", "temperature", "velx", "vely"],
-    norm="none",
+    norm="none",    
     downsample_factor=1,
     time_window=5,
     start_time=100,
-    return_fluid_params=False,
+    return_fluid_params=True,
 )
 
-model_name = "avit"
+model_name = "filmavit"
 model_kwargs = {
-            "input_fields": 4,
-            "output_fields": 4,
-            "time_window": 5,
-            "patch_size": 16,
-            "embed_dim": 384,
-            "processor_blocks": 12,
-            "num_heads": 6,
-            "drop_path": 0.2,
-            "attn_scale": True,
-            "feat_scale": True,
-            }
+    "input_fields": 4,
+    "output_fields": 4,
+    "time_window": 5,
+    "patch_size": 16,
+    "embed_dim": 384,
+    "processor_blocks": 6,
+    "num_heads": 6,
+    "drop_path": 0.2,
+    "attn_scale": True,
+    "feat_scale": True,
+    "num_fluid_params": 9,
+}
 
 model = get_model(model_name, **model_kwargs)
 model = model.cuda()
 
-weights_path = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/hpc_ckpt_3.ckpt"
+#weights_path = "model-zoo/Bubbleformer-S-PB-Subcooled.ckpt" 
+weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47070126/lightning_logs/version_0/checkpoints/epoch=8-step=68112.ckpt"
 model_data = torch.load(weights_path, weights_only=False)
 
 diff_term = {
@@ -217,6 +225,7 @@ div_term = {
     "velx": 1.0,
     "vely": 1.0,
 }
+
 # diff_term = torch.tensor(diff_term)
 # div_term = torch.tensor(div_term)
 weight_state_dict = OrderedDict()
@@ -224,6 +233,8 @@ for key, val in model_data["state_dict"].items():
     name = key[6:]
     weight_state_dict[name] = val
 del model_data
+
+print(model)
 
 model.load_state_dict(weight_state_dict)
 
@@ -236,13 +247,15 @@ model_preds = []
 model_targets = []
 timesteps = []
 
-for itr in range(0, 500, skip_itrs):
-    inp, tgt = test_dataset[itr]
+for itr in range(0, 5, skip_itrs):
+    inp, tgt, fluid_params = test_dataset[itr]
     print(f"Autoreg pred {itr}, inp tw [{start_time+itr}, {start_time+itr+skip_itrs}], tgt tw [{start_time+itr+skip_itrs}, {start_time+itr+2*skip_itrs}]")
     if len(model_preds) > 0:
         inp = model_preds[-1] # T, C, H, W
     inp = inp.cuda().float().unsqueeze(0)
-    pred = model(inp)
+    fluid_params = fluid_params.cuda().float().unsqueeze(0)
+    
+    pred = model(inp, fluid_params)
     pred = pred.squeeze(0).detach().cpu()
     tgt = tgt.detach().cpu()
 
@@ -256,10 +269,15 @@ model_targets = torch.cat(model_targets, dim=0)     # T, C, H, W
 timesteps = torch.cat(timesteps, dim=0)             # T,
 num_var = len(test_dataset.fields)                  # C
 
-# preds = model_preds * div_term.view(1, num_var, 1, 1) + diff_term.view(1, num_var, 1, 1)     # denormalize
-# targets = model_targets * div_term.view(1, num_var, 1, 1) + diff_term.view(1, num_var, 1, 1) # denormalize
+print(model_preds.shape, model_targets.shape)
 
-save_dir = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/epoch_327_outputs/fc_91"
+#preds = model_preds * test_dataset.div_terms.view(1, num_var, 1, 1) + test_dataset.diff_terms.view(1, num_var, 1, 1)     # denormalize
+#targets = model_targets * div_term.view(1, num_var, 1, 1) + diff_term.view(1, num_var, 1, 1) # denormalize
+
+#save_dir = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/epoch_327_outputs/fc_91"
+save_dir = "./subcooled_fc72_97"
+print(f"saving to {save_dir}")
+
 os.makedirs(save_dir, exist_ok=True)
 save_path = os.path.join(save_dir, "predictions.pt")
 torch.save({"preds": model_preds, "targets": model_targets, "timesteps": timesteps}, save_path)
