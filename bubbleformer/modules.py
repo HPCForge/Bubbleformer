@@ -15,7 +15,6 @@ from bubbleformer.utils.losses import LpLoss
 from bubbleformer.utils.lr_schedulers import CosineWarmupLR
 from bubbleformer.utils.plot_utils import wandb_sdf_plotter, wandb_temp_plotter, wandb_vel_plotter
 
-
 class ForecastModule(L.LightningModule):
     """
     Module for training forecasting models with equal
@@ -51,7 +50,7 @@ class ForecastModule(L.LightningModule):
         self.model_cfg["params"]["input_fields"] = len(self.data_cfg["input_fields"])
         self.model_cfg["params"]["output_fields"] = len(self.data_cfg["output_fields"])
         self.model_cfg["params"]["time_window"] = self.data_cfg["time_window"]
-        self.model = get_model(self.model_cfg["name"], **self.model_cfg["params"]).to(torch.bfloat16)
+        self.model = get_model(self.model_cfg["name"], **self.model_cfg["params"])
         #self.model = torch.compile(self.model)
 
         self.save_hyperparameters()
@@ -308,7 +307,7 @@ class ConditionedForecastModule(ForecastModule):
         inp, tgt, cond = batch
         pred = self.model(inp, cond)
         loss = self.criterion(pred, tgt)
-
+        
         self.log(
             "train_loss",
             loss,

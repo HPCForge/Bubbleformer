@@ -41,7 +41,7 @@ class SpatialNeighborhoodAttention(nn.Module):
     def forward(self, x):
         b, t, h, w, c = x.shape
         
-        # rotary embedding expects [batch, heads, seq, dim] layout
+        # rotary embedding expects seq-last [batch, heads, seq1, seq2, dim] layout
         heads = einops.rearrange(self.input_head(x), 
                                  "b t h w (heads head_dim) -> (b t) heads h w head_dim", 
                                  heads=self.num_heads).contiguous()
@@ -52,8 +52,7 @@ class SpatialNeighborhoodAttention(nn.Module):
         q = apply_rotary_emb(freqs, q)
         k = apply_rotary_emb(freqs, k)
         
-        # natten expects [batch, seq1, seq2, heads, dim] layout
-        # TODO: we can just not do the rearrange above.
+        # natten expects head-last [batch, seq1, seq2, heads, dim] layout
         q, k, v = map(
             lambda qkv: rearrange(qkv, "bt heads h w head_dim -> bt h w heads head_dim").contiguous(), [q, k, v]
         )

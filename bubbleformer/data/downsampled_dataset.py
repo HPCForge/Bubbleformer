@@ -7,9 +7,11 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-class BubbleForecast(Dataset):
+class DownsampledBubbleForecast(Dataset):
     """
-    Dataset class for time series forecasting on the BubbleML dataset
+    Dataset class for time series forecasting on the BubbleML dataset.
+    This downsamples the full dataset and stores it in cpu memory. This can be
+    used to accelerate data loading on a networked file system.
     """
     def __init__(
         self,
@@ -24,6 +26,11 @@ class BubbleForecast(Dataset):
     ):
         super().__init__()
         self.filenames = filenames
+        self.norm = norm
+        self.downsample_factor = downsample_factor
+        self.time_window = time_window
+        self.start_time = start_time
+        
         if input_fields is not None:
             self.input_fields = input_fields
         else:
@@ -32,21 +39,12 @@ class BubbleForecast(Dataset):
             self.output_fields = output_fields
         else:
             self.output_fields = ["dfun", "temperature", "velx", "vely"]
-        self.norm = norm
-        self.downsample_factor = downsample_factor
-        self.time_window = time_window
-        self.start_time = start_time
-        self.data = [h5.File(filename, "r") for filename in filenames]
-        self.num_trajs = []
-        self.traj_lens = []
-
-        for h5_file in self.data:
-            self.num_trajs.append(1)
-            self.traj_lens.append(h5_file[self.input_fields[0]].shape[0])
-
-        self.input_num_fields = len(self.input_fields)
-        self.output_num_fields = len(self.output_fields)
         self.fields = list(set(self.input_fields + self.output_fields))
+        
+        self.data = self._load_data()
+        self.num_trajs = [1 for _ in range(len(self.filenames))]
+        self.traj_lens = [d[self.input_fields[0]].shape[0] for d in self.data]
+
         self.diff_terms = {k:[] for k in self.fields}
         self.div_terms = {k:[] for k in self.fields}
 
@@ -58,6 +56,25 @@ class BubbleForecast(Dataset):
                 with open(fluid_params_file, "r", encoding="utf-8") as f:
                     fluid_params = json.load(f)
                 self.fluid_params.append(fluid_params)
+
+    def _load_data(self):
+        hdf5_files = [h5.File(filename, "r") for filename in self.filenames]
+        data = []
+        for hdf5_file in hdf5_files:
+            d = {}
+            for field in self.fields:
+                field_data = torch.tensor(hdf5_file[field][...])
+                if self.downsample_factor > 1:
+                    _, h, w = field_data.shape
+                    new_h, new_w = h // self.downsample_factor, w // self.downsample_factor
+                    field_data = F.interpolate(
+                        field_data.unsqueeze(1),
+                        size=(new_h, new_w),
+                        mode="nearest"
+                    ).squeeze(1)
+                d[field] = field_data
+            data.append(d)
+        return data
 
     def __len__(self):
         total_len = 0
@@ -128,35 +145,18 @@ class BubbleForecast(Dataset):
         out_data = []
 
         for field in self.input_fields:
-            data_item = torch.tensor(self.data[file_idx][field][inp_slice])
-            if self.downsample_factor > 1:
-                _, h, w = data_item.shape
-                new_h, new_w = h // self.downsample_factor, w // self.downsample_factor
-                data_item = F.interpolate(
-                    data_item.unsqueeze(1),
-                    size=(new_h, new_w),
-                    mode="nearest"
-                ).squeeze(1)
-                
+            data_item = torch.tensor(self.data[file_idx][field][inp_slice])                
             inp_data.append(
                 (data_item - self.diff_terms[field]) / self.div_terms[field]
             )
         for field in self.output_fields:
             data_item = torch.tensor(self.data[file_idx][field][out_slice])
-            if self.downsample_factor > 1:
-                _, h, w = data_item.shape
-                new_h, new_w = h // self.downsample_factor, w // self.downsample_factor
-                data_item = F.interpolate(
-                    data_item.unsqueeze(1),
-                    size=(new_h, new_w),
-                    mode="nearest"
-                ).squeeze(1)
             out_data.append(
                 (data_item - self.diff_terms[field]) / self.div_terms[field]
             )
 
-        inp_data = torch.stack(inp_data)                                   # (in_C, T, H, W)
-        out_data = torch.stack(out_data)                                   # (out_C, T, H, W)
+        inp_data = torch.stack(inp_data) # (in_C, T, H, W)
+        out_data = torch.stack(out_data) # (out_C, T, H, W)
 
         if self.return_fluid_params:
             fluid_params = self.fluid_params[file_idx]

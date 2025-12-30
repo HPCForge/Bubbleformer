@@ -43,7 +43,7 @@ class TemporalAttention(nn.Module):
         inp = x.clone()
         x = self.input_head(x)
         x = x.view(batch_size, t, h, w, self.num_heads, 3 * self.head_dim)
-        x = x.permute(0, 2, 3, 4, 1, 5).contiguous().view(batch_size * h * w, self.num_heads, t, 3 * self.head_dim)
+        x = rearrange(x, "b t h w heads head_dim -> (b h w) heads t head_dim").contiguous()
         q, k, v = x.tensor_split(3, dim=-1)
         q = self.qnorm(q)
         k = self.knorm(k)

@@ -11,10 +11,10 @@ from torch.profiler import profile, record_function, ProfilerActivity
 from torch.utils.data import DataLoader
 from lightning import seed_everything, Trainer
 from lightning.pytorch.loggers import CSVLogger
-from lightning.pytorch.callbacks import ModelSummary, Callback
+from lightning.pytorch.callbacks import ModelSummary, Callback, ModelCheckpoint
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
-from bubbleformer.data import BubbleForecast
+from bubbleformer.data import BubbleForecast, DownsampledBubbleForecast
 from bubbleformer.modules import ForecastModule, ConditionedForecastModule
 from bubbleformer.models.axial_vit import SpaceTimeBlock
 
@@ -97,7 +97,7 @@ def main(cfg: DictConfig) -> None:
 
     logger = CSVLogger(save_dir=params["log_dir"])
 
-    train_dataset = BubbleForecast(
+    train_dataset = DownsampledBubbleForecast(
                 filenames=cfg.data_cfg.train_paths,
                 input_fields=cfg.data_cfg.input_fields,
                 output_fields=cfg.data_cfg.output_fields,
@@ -108,7 +108,7 @@ def main(cfg: DictConfig) -> None:
                 return_fluid_params=cfg.data_cfg.return_fluid_params,
             )
     normalization_constants = train_dataset.normalize()
-    val_dataset = BubbleForecast(
+    val_dataset = DownsampledBubbleForecast(
                 filenames=cfg.data_cfg.val_paths,
                 input_fields=cfg.data_cfg.input_fields,
                 output_fields=cfg.data_cfg.output_fields,
@@ -158,22 +158,31 @@ def main(cfg: DictConfig) -> None:
             )
 
     trainer = Trainer(
-        accelerator="gpu",# if cfg.devices > 1 else "cpu",
-        devices=cfg.devices,# if cfg.devices > 0 else 0,
+        accelerator="gpu",
+        devices=cfg.devices,
         num_nodes=cfg.nodes,
-        strategy="auto",#"ddp" if cfg.devices > 1 else "auto",
+        strategy="auto",
         max_epochs=cfg.max_epochs,
-        #max_steps=200, # NOTE: limited for profiling
+        #max_steps=30, # NOTE: limited for profiling
+        limit_val_batches=0.2,
         logger=logger,
         default_root_dir=params["log_dir"],
         plugins=[SLURMEnvironment(requeue_signal=signal.SIGHUP)],
         enable_model_summary=True,
-        #limit_train_batches=1000,
-        #limit_val_batches=25,
         num_sanity_val_steps=0,
-        callbacks=[ModelSummary(max_depth=-1), PreemptionCheckpointCallback(preempt_ckpt_path)],
-        #profiler="pytorch",
-        precision="bf16-mixed"
+        callbacks=[
+            ModelSummary(max_depth=-1), 
+            PreemptionCheckpointCallback(preempt_ckpt_path),
+            ModelCheckpoint(
+                dirpath=params["log_dir"] + "/checkpoints",
+                monitor="val_loss",
+                mode="min",
+                save_top_k=2,
+                save_last=True,
+                save_on_exception=True
+            )
+        ],
+        #precision="bf16-mixed",
     )
     
     if is_leader_process():
@@ -209,19 +218,13 @@ def main(cfg: DictConfig) -> None:
     #    #profile_memory=True,
     #    with_stack=True,
     #) as prof:
-    if cfg.checkpoint_path:
-        trainer.fit(
-            train_module,
-            train_dataloaders=train_dataloader,
-            val_dataloaders=val_dataloader,
-            ckpt_path=cfg.checkpoint_path,
-        )
-    else:
-        trainer.fit(
-            train_module,
-            train_dataloaders=train_dataloader,
-            val_dataloaders=val_dataloader,
-        )
+
+    trainer.fit(
+        train_module,
+        train_dataloaders=train_dataloader,
+        val_dataloaders=val_dataloader
+    )
+    
     #prof.export_memory_timeline("memory_timeline.html", device="cuda:0")
     #prof.export_chrome_trace("trace.json")
     #print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
@@ -237,7 +240,6 @@ def main(cfg: DictConfig) -> None:
 
     if wandb_run:
         wandb_run.finish()
-
 
 if __name__ == "__main__":
     # pylint: disable=no-value-for-parameter

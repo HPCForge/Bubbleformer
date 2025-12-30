@@ -74,14 +74,14 @@ class SpaceTimeBlock(nn.Module):
                 with record_function("spatial"):
                     x = self.spatial(x)
             with record_function("pre_norm"):          
-                x = self.pre_norm(x + inp)
+                x = self.pre_norm(x) + inp
 
             # MLP with a skip connection
             intermediate = x.clone()
             with record_function("mlp"):
                 x = self.mlp(x)
             with record_function("post_norm"):
-                x = self.post_norm(x + intermediate)
+                x = self.post_norm(x) + intermediate
 
         return x
 
@@ -173,7 +173,7 @@ class AViT(nn.Module):
 
 
 @register_model("filmavit")
-@torch.compile
+#@torch.compile
 class FiLMConditionedAViT(nn.Module):
     """
     FiLM (Feature-wise Linear Modulation) is an expressive and lightweight way to 
@@ -251,20 +251,19 @@ class FiLMConditionedAViT(nn.Module):
         # Permute to better order for attention (B, T, H, W, C)
         # TODO: IDK if input should be in this format for the embedding or not...
         # I think conv's do support NHWC layout.
-        x = x.permute(0, 1, 3, 4, 2).contiguous()
+        x = rearrange(x, "b t c h w -> b t h w c").contiguous()
 
         # Apply FiLM conditioning on the embeddings
         with record_function("film_embed"):
-            x = self.film_embed(x, fluid_params)  # (B, T, H, W, C)
+            x = self.film_embed(x, fluid_params)
 
         # Attention blocks
         for idx, blk in enumerate(self.blocks):
             with record_function(f"block_{idx}"):
                x = blk(x)
 
-        # Permute back to (B, T, C, H, W)
-        x = x.permute(0, 1, 4, 2, 3).contiguous()
-
+        x = rearrange(x, "b t h w c -> b t c h w").contiguous()
+       
         # Decode
         with record_function("decode"):
             x = rearrange(x, "b t c h w -> (b t) c h w")
