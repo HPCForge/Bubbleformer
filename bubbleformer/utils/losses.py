@@ -92,3 +92,15 @@ class LpLoss(nn.Module):
             diff = self.reduce_all(diff).squeeze()
 
         return diff
+
+class L1Loss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.loss = nn.L1Loss(reduction="mean")
+    
+    def forward(self, pred, target):
+        channels = pred.shape[2]
+        loss = 0
+        for c in range(channels):
+            loss += self.loss(pred[:, :, c, :, :], target[:, :, c, :, :])
+        return loss / channels

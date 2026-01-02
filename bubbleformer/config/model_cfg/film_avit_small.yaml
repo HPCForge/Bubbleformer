@@ -1,6 +1,6 @@
 name: filmavit
 params:
-  patch_size: 16
+  patch_size: 4
   embed_dim: 384
   processor_blocks: 6
   num_heads: 6

@@ -1,5 +1,5 @@
 name: cosine_warmup
 params:
-  warmup_iters: 1000
+  warmup_iters: 100
   eta_min: 1.0e-6
 

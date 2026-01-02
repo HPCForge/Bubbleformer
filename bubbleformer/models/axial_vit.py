@@ -85,7 +85,6 @@ class SpaceTimeBlock(nn.Module):
 
         return x
 
-
 @register_model("avit")
 class AViT(nn.Module):
     """
@@ -241,12 +240,16 @@ class FiLMConditionedAViT(nn.Module):
         fluid_params: (B, num_fluid_params)
         """
         B, T, _, _, _ = x.shape
+        
+        input = x.clone()
 
         # Encode
         with record_function("encode"):
             x = rearrange(x, "b t c h w -> (b t) c h w")
             x = self.embed(x)
             x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
+            
+        embed = x.clone()
 
         # Permute to better order for attention (B, T, H, W, C)
         # TODO: IDK if input should be in this format for the embedding or not...
@@ -263,10 +266,17 @@ class FiLMConditionedAViT(nn.Module):
                x = blk(x)
 
         x = rearrange(x, "b t h w c -> b t c h w").contiguous()
+        
+        # Skip connection from patch embeddings
+        x = x + embed
        
         # Decode
         with record_function("decode"):
             x = rearrange(x, "b t c h w -> (b t) c h w")
             x = self.debed(x)
             x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
+        
+        # Skip connection from the original input
+        x = x + input
+        
         return x

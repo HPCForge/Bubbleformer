@@ -26,6 +26,7 @@ dependencies = [
     "wandb",
     "black",
     "lion-pytorch",
+    "rich"
 ]
 
 # Usually stuff is expected to be in `src/bubbleformer/`

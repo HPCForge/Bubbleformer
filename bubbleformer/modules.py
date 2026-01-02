@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import lightning as L
 
 from bubbleformer.models import get_model
-from bubbleformer.utils.losses import LpLoss
+from bubbleformer.utils.losses import LpLoss, L1Loss
 from bubbleformer.utils.lr_schedulers import CosineWarmupLR
 from bubbleformer.utils.plot_utils import wandb_sdf_plotter, wandb_temp_plotter, wandb_vel_plotter
 
@@ -46,7 +46,7 @@ class ForecastModule(L.LightningModule):
             self.normalization_constants = normalization_constants
         self.log_wandb = log_wandb
 
-        self.criterion = LpLoss(d=2, p=2, reduce_dims=[0,1,2], reductions=["mean", "mean", "sum"])
+        self.criterion = L1Loss() #LpLoss(d=2, p=2, reduce_dims=[0,1,2], reductions=["mean", "mean", "sum"])
         self.model_cfg["params"]["input_fields"] = len(self.data_cfg["input_fields"])
         self.model_cfg["params"]["output_fields"] = len(self.data_cfg["output_fields"])
         self.model_cfg["params"]["time_window"] = self.data_cfg["time_window"]

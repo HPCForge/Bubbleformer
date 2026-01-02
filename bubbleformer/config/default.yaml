@@ -4,8 +4,8 @@ seed: 42
 nodes: 1
 devices: 1
 
-max_epochs: 10
-batch_size: 8
+max_epochs: 40
+batch_size: 16
 
 checkpoint_path:
 

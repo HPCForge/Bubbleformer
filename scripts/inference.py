@@ -194,12 +194,13 @@ test_dataset = BubbleForecast(
     return_fluid_params=True,
 )
 
+# TODO: This should all be written/read to/from a config file with the checkpoints
 model_name = "filmavit"
 model_kwargs = {
     "input_fields": 4,
     "output_fields": 4,
     "time_window": 5,
-    "patch_size": 16,
+    "patch_size": 4,
     "embed_dim": 384,
     "processor_blocks": 6,
     "num_heads": 6,
@@ -216,7 +217,7 @@ model = model.cuda()
 #weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47070126/lightning_logs/version_0/checkpoints/epoch=9-step=75680.ckpt"
 #weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47209045/lightning_logs/version_0/checkpoints/epoch=0-step=6000.ckpt"
 #weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47219168/lightning_logs/version_0/checkpoints/epoch=4-step=9460.ckpt"
-weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47235309/checkpoints/last.ckpt"
+weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47238340/checkpoints/epoch=29-step=56760.ckpt"
 model_data = torch.load(weights_path, weights_only=False)
 
 diff_term = {
@@ -253,7 +254,7 @@ model_preds = []
 model_targets = []
 timesteps = []
 
-for itr in range(0, 15, skip_itrs):
+for itr in range(0, len(test_dataset), skip_itrs):
     inp, tgt, fluid_params = test_dataset[itr]
     print(f"Autoreg pred {itr}, inp tw [{start_time+itr}, {start_time+itr+skip_itrs}], tgt tw [{start_time+itr+skip_itrs}, {start_time+itr+2*skip_itrs}]")
     if len(model_preds) > 0:
@@ -261,10 +262,6 @@ for itr in range(0, 15, skip_itrs):
     inp = inp.cuda().to(torch.float32).unsqueeze(0)
     fluid_params = fluid_params.cuda().to(torch.float32).unsqueeze(0)
     
-    print(inp.size())
-    print(tgt.size())
-    print(fluid_params.size())
-    #with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
     pred = model(inp, fluid_params)
 
     pred = pred.to(torch.float32)
@@ -274,7 +271,6 @@ for itr in range(0, 15, skip_itrs):
     model_preds.append(pred)
     model_targets.append(tgt)
     timesteps.append(torch.arange(start_time+itr+skip_itrs, start_time+itr+2*skip_itrs))
-    print(criterion(pred, tgt))
 
 model_preds = torch.cat(model_preds, dim=0)         # T, C, H, W
 model_targets = torch.cat(model_targets, dim=0)     # T, C, H, W

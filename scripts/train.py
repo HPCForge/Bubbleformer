@@ -11,7 +11,8 @@ from torch.profiler import profile, record_function, ProfilerActivity
 from torch.utils.data import DataLoader
 from lightning import seed_everything, Trainer
 from lightning.pytorch.loggers import CSVLogger
-from lightning.pytorch.callbacks import ModelSummary, Callback, ModelCheckpoint
+from lightning.pytorch.callbacks import ModelSummary, Callback, ModelCheckpoint, RichProgressBar
+from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
 from bubbleformer.data import BubbleForecast, DownsampledBubbleForecast
@@ -156,6 +157,21 @@ def main(cfg: DictConfig) -> None:
                 log_wandb=cfg.use_wandb,
                 normalization_constants=(diff_term, div_term),
             )
+        
+    progress_bar = RichProgressBar(
+        theme=RichProgressBarTheme(
+            description="green_yellow",
+            progress_bar="green1",
+            progress_bar_finished="green1",
+            progress_bar_pulse="#6206E0",
+            batch_progress="green_yellow",
+            time="grey82",
+            processing_speed="grey82",
+            metrics="grey82",
+            metrics_text_delimiter="\n",
+            metrics_format=".3e",
+        )
+    )
 
     trainer = Trainer(
         accelerator="gpu",
@@ -180,7 +196,8 @@ def main(cfg: DictConfig) -> None:
                 save_top_k=2,
                 save_last=True,
                 save_on_exception=True
-            )
+            ),
+            progress_bar
         ],
         #precision="bf16-mixed",
     )
