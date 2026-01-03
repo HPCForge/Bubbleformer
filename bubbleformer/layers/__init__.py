@@ -7,3 +7,4 @@ from .attention import (
     SpatialNeighborhoodAttention,
     TemporalAttention,
 )
+from.space_time_block import SpaceTimeBlock

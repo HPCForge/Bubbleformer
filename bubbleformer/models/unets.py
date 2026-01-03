@@ -6,8 +6,6 @@ from einops import rearrange
 from bubbleformer.layers import ClassicUnetBlock, ResidualBlock, MiddleBlock
 from ._api import register_model
 
-__all__ = ["ModernUnet", "ClassicUnet"]
-
 class Upsample(nn.Module):
     """Scale up the feature map by 2 times
     Args:

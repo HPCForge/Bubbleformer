@@ -13,13 +13,13 @@ use_wandb: False
 wandb_tags:
   - time_window-5
   - relative_l2_loss
-  - FiLM-AViT-Small
-  - singlebubble
-  - AdamW_optimizer
+  - Neighbor-ViT-Small
+  - poolboiling-subcooled
+  - AdamW-optimizer
 defaults:
   - _self_
   - data_cfg: poolboiling_subcooled
   #- data_cfg: singlebubble
-  - model_cfg: film_avit_small
+  - model_cfg: neighbor_vit_small
   - optim_cfg: adamw
   - scheduler_cfg: cosine_warmup

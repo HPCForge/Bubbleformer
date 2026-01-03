@@ -1,3 +1,7 @@
-from .axial_vit import *
-from .unets import *
-from ._api import *
+from .neighbor_vit import NeighborViT
+from .unets import ModernUnet, ClassicUnet
+from ._api import (
+    register_model,
+    list_models,
+    get_model
+)

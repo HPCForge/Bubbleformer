@@ -1,4 +1,4 @@
-name: filmavit
+name: neighbor_vit
 params:
   patch_size: 4
   embed_dim: 384
