@@ -16,11 +16,7 @@ from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTh
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
 from bubbleformer.data import BubbleForecast, DownsampledBubbleForecast
-from bubbleformer.modules import ForecastModule, ConditionedForecastModule
-from bubbleformer.models.axial_vit import SpaceTimeBlock
-
-def checkpoint_policy(module, **kwargs):
-    return isinstance(module, SpaceTimeBlock)
+from bubbleformer.moe_modules import MoEForecastModule, MoEConditionedForecastModule
 
 def is_leader_process():
     """
@@ -140,7 +136,7 @@ def main(cfg: DictConfig) -> None:
         prefetch_factor=1,
     )
     if cfg.data_cfg.return_fluid_params:
-        train_module = ConditionedForecastModule(
+        train_module = MoEConditionedForecastModule(
                 model_cfg=cfg.model_cfg,
                 data_cfg=cfg.data_cfg,
                 optim_cfg=cfg.optim_cfg,
@@ -149,7 +145,7 @@ def main(cfg: DictConfig) -> None:
                 normalization_constants=(diff_term, div_term),
             )
     else:
-        train_module = ForecastModule(
+        train_module = MoEForecastModule(
                 model_cfg=cfg.model_cfg,
                 data_cfg=cfg.data_cfg,
                 optim_cfg=cfg.optim_cfg,

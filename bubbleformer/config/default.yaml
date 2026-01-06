@@ -19,7 +19,6 @@ wandb_tags:
 defaults:
   - _self_
   - data_cfg: poolboiling_subcooled
-  #- data_cfg: singlebubble
-  - model_cfg: neighbor_vit_small
+  - model_cfg: neighbor_moe_small
   - optim_cfg: adamw
   - scheduler_cfg: cosine_warmup

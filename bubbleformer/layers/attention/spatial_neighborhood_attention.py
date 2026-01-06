@@ -32,7 +32,7 @@ class SpatialNeighborhoodAttention(nn.Module):
         
         # TODO: should each attention block use the same rotary embedding?
         self.rotary_emb = RotaryEmbedding(
-            # NOTE: This much be smaller than the head dim. 
+            # NOTE: This must be smaller than the head dim. 
             dim=self.head_dim // 3,
             freqs_for="pixel",
             max_freq=256

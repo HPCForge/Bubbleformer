@@ -4,7 +4,4 @@ params:
   embed_dim: 384
   processor_blocks: 6
   num_heads: 6
-  drop_path: 0.2
-  attn_scale: False
-  feat_scale: False
   num_fluid_params: 9

@@ -52,7 +52,6 @@ class TemporalAttention(nn.Module):
         k = self.rotary_emb.rotate_queries_or_keys(k)
 
         # Sequence length is really small (like 5)... So, just compute the attention manually.
-        # This could also be done with a flash attention with a causal mask.
         x = F.softmax(q @ k.transpose(-2, -1) / math.sqrt(self.head_dim), dim=-1) @ v
         x = rearrange(x, "(b h w) num_heads t head_dim -> b t h w (num_heads head_dim)", 
                       t=t, h=h, w=w).contiguous()

@@ -59,6 +59,28 @@ class ForecastModule(L.LightningModule):
         self.train_start_time = None
         self.val_start_time = None
 
+    def default_log(self, key, value, **kwargs):
+        kwargs["on_step"] = True
+        kwargs["on_epoch"] = True
+        kwargs["prog_bar"] = True
+        kwargs["logger"] = True
+        self.log(key, value, **kwargs)
+        if self.log_wandb and self.trainer.is_global_zero:
+            wandb.log({key: value})
+            
+    def default_log_dict(self, dict, **kwargs):
+        kwargs["on_step"] = True
+        kwargs["on_epoch"] = True
+        kwargs["prog_bar"] = True
+        kwargs["logger"] = True
+        self.log_dict(dict, **kwargs)
+        if self.log_wandb and self.trainer.is_global_zero:
+            wandb.log(dict)
+        
+    def get_current_lr(self):
+        opt = self.optimizers()
+        return opt.param_groups[0]['lr']
+        
     def setup(
         self,
         stage: Optional[str] = None
@@ -81,26 +103,10 @@ class ForecastModule(L.LightningModule):
         pred = self.model(inp)
         loss = self.criterion(pred, tgt)
 
-        self.log(
-            "train_loss",
-            loss,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True
-        )
-        opt = self.optimizers()
-        current_lr = opt.param_groups[0]['lr']
-        self.log(
-            "learning_rate",
-            current_lr,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
-            logger=True
-        )
-        if self.log_wandb and self.trainer.is_global_zero:
-            wandb.log({"train_loss": loss, "learning_rate": current_lr})
+        self.default_log_dict({
+            "train_loss": loss,
+            "learning_rate": self.get_current_lr()
+        })
 
         return loss
 
@@ -115,17 +121,8 @@ class ForecastModule(L.LightningModule):
         if batch_idx == 0:
             self.validation_sample = (inp.detach(), tgt.detach(), pred.detach())
 
-        self.log(
-            "val_loss",
-            loss,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True
-        )
-        if self.log_wandb and self.trainer.is_global_zero:
-            wandb.log({"val_loss": loss})
-
+        self.default_log_dict({"val_loss": loss})
+        
         return loss
 
     def configure_optimizers(self):
@@ -139,8 +136,6 @@ class ForecastModule(L.LightningModule):
             optimizer = Lion(self.model.parameters(), **opt_params)
         else:
             raise ValueError(f"Optimizer {opt_name} not supported")
-
-        #optimizer = torch.compile(optimizer)
 
         scheduler_name = self.scheduler_cfg["name"]
         scheduler_params = self.scheduler_cfg["params"]
@@ -308,26 +303,10 @@ class ConditionedForecastModule(ForecastModule):
         pred = self.model(inp, cond)
         loss = self.criterion(pred, tgt)
         
-        self.log(
-            "train_loss",
-            loss,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True
-        )
-        opt = self.optimizers()
-        current_lr = opt.param_groups[0]['lr']
-        self.log(
-            "learning_rate",
-            current_lr,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
-            logger=True
-        )
-        if self.log_wandb and self.trainer.is_global_zero:
-            wandb.log({"train_loss": loss, "learning_rate": current_lr})
+        self.default_log_dict({
+            "train_loss": loss,
+            "learning_rate": self.get_current_lr()
+        })
 
         return loss
 
@@ -342,15 +321,61 @@ class ConditionedForecastModule(ForecastModule):
         if batch_idx == 0:
             self.validation_sample = (inp.detach(), tgt.detach(), pred.detach())
 
-        self.log(
-            "val_loss",
-            loss,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True
-        )
-        if self.log_wandb and self.trainer.is_global_zero:
-            wandb.log({"val_loss": loss})
+        self.default_log_dict({"val_loss": loss})
 
+        return loss
+    
+class MoEConditionedForecastModule(ConditionedForecastModule):
+    def __init__(
+        self,
+        model_cfg: DictConfig,
+        data_cfg: DictConfig,
+        optim_cfg: DictConfig,
+        scheduler_cfg: DictConfig,
+        log_wandb: bool = False,
+        normalization_constants: Tuple[List, List] = None
+    ):
+        super().__init__(
+            model_cfg=model_cfg,
+            data_cfg=data_cfg,
+            optim_cfg=optim_cfg,
+            scheduler_cfg=scheduler_cfg,
+            log_wandb=log_wandb,
+            normalization_constants=normalization_constants
+        )
+
+    def training_step(
+        self,
+        batch: Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor],
+        batch_idx: int
+    ) -> torch.Tensor:
+        inp, tgt, cond = batch
+        pred, moe_outputs = self.model(inp, cond)
+        
+        data_loss = self.criterion(pred, tgt)
+        routing_loss = sum(moe_output.load_balance_loss for moe_output in moe_outputs)
+        loss = data_loss + routing_loss
+        
+        self.default_log_dict({
+            "train_loss": loss,
+            "train_data_loss": data_loss,
+            "train_routing_loss": routing_loss,
+            "learning_rate": self.get_current_lr()
+        })
+
+        return loss
+
+    def validation_step(
+        self,
+        batch: Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor],
+        batch_idx: int
+    ) -> torch.Tensor:
+        inp, tgt, cond = batch
+        pred, _ = self.model(inp, cond)
+        loss = self.criterion(pred, tgt)
+        if batch_idx == 0:
+            self.validation_sample = (inp.detach(), tgt.detach(), pred.detach())
+
+        self.default_log_dict({"val_loss": loss})
+    
         return loss
