@@ -19,17 +19,17 @@ def load_balance_loss(
 ):
     r"""
     Switch-transformer load balance loss.
+    This computes the dot product of two vectors:
+        1. the percentage of tokens routed to each expert.
+        2. the average routing probability of each expert.
     Args:
         router_logits: (num_tokens, num_experts)
         expert_counts: (num_experts,)
         num_tokens: int
     """
-    
     mean_tokens_per_expert = expert_counts.to(torch.float32) / expert_counts.to(torch.float32).sum()
-    
     router_probs = F.softmax(router_logits, dim=-1)
     mean_router_prob_per_expert = router_probs.mean(dim=0)
-    
     loss = torch.dot(mean_tokens_per_expert, mean_router_prob_per_expert) * num_experts
     return loss
 
@@ -86,16 +86,20 @@ class TopkMoE(nn.Module):
         topk_probs, topk_indices = torch.topk(router_probs, k=self.topk, dim=-1)
         group_indices, indices, counts = get_token_indices(topk_indices, self.num_experts)
         
+        # Map tokens into groups based on their assigned experts
         groups = x[indices // self.topk]
         
+        # Compute all of the experts
         groups = torch._grouped_mm(groups, self.w1, group_indices)
         groups = F.gelu(groups)
         groups = torch._grouped_mm(groups, self.w2, group_indices)
         
+        # Scatter the tokens to [B, topk, hidden_dim]
         scattered = torch.empty_like(groups)
         scattered[indices] = groups
         scattered = scattered.view(batch_size, self.topk, self.hidden_dim)
         
+        # reduce the output tokens and scale by the routing probability
         out = (scattered * topk_probs.unsqueeze(-1)).sum(dim=1).view(input_shape)
         
         loss = load_balance_loss(router_logits, counts, self.topk, self.num_experts) * self.load_balance_loss_weight

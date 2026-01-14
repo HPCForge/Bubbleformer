@@ -1,4 +1,4 @@
-log_dir: /pub/afeeney/bubbleformer_logs #/pub/sheikhh1/bubbleformer_logs
+log_dir: /pub/afeeney/bubbleformer_logs
 seed: 42
 
 nodes: 1
@@ -11,14 +11,14 @@ checkpoint_path:
 
 use_wandb: False
 wandb_tags:
-  - time_window-5
-  - relative_l2_loss
-  - Neighbor-ViT-Small
-  - poolboiling-subcooled
+  - time-window-5
+  - relative-l2-loss
+  - Neighbor-MoE-Small
+  - poolboiling
   - AdamW-optimizer
 defaults:
   - _self_
-  - data_cfg: poolboiling_subcooled
+  - data_cfg: poolboiling
   - model_cfg: neighbor_moe_small
   - optim_cfg: adamw
   - scheduler_cfg: cosine_warmup

@@ -4,14 +4,14 @@ import torch.nn as nn
 
 def eikonal_loss(phi):
     """
-    phi = SDF torch.Tensor (B, T, H, W)
+    This enforces the eikonal equation: ||grad(phi)|| = 1.
+    Args:
+        phi: SDF torch.Tensor (B, T, H, W).
     """
     dx = 1/32
     grad_phi_y, grad_phi_x = torch.gradient(phi, spacing=dx, dim=(-2, -1), edge_order=1)
     grad_mag = torch.sqrt(grad_phi_y**2 + grad_phi_x**2)
-
     eikonal_mse = (grad_mag - 1.0) ** 2
-
     return eikonal_mse.mean()
 
 class LpLoss(nn.Module):
