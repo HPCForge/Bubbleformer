@@ -111,3 +111,89 @@ class HMLPDebed(nn.Module):
             torch.Tensor: Output tensor of shape (B, C, H, W)
         """
         return self.out_proj(x)
+
+class OverlappingEmbed(nn.Module):
+    r"""
+    Similar to the HMLPEmbed, but the patches are constructed using
+    overlapping regions of the input.
+    """
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        embed_dim: int,
+        patch_size: int = 4,
+        stride: int = 2,
+    ):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.patch_size = patch_size
+        self.stride = stride
+        
+        self.conv1 = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=embed_dim,
+            kernel_size=4,
+            stride=2,
+            padding=0,
+        )
+        self.conv2 = nn.Conv2d(
+            in_channels=embed_dim,
+            out_channels=out_channels,
+            kernel_size=2,
+            stride=2
+        )
+        
+        self.norm = nn.InstanceNorm2d(out_channels, affine=True)
+        self.act = nn.GELU()
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv1(x)
+        x = self.norm(x)
+        x = self.act(x)
+        x = self.conv2(x)
+        return x
+    
+class OverlappingDebed(nn.Module):
+    r"""
+    Similar to the HMLPDebed, but the patches are constructed using
+    overlapping regions of the input.
+    """
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        embed_dim: int,
+        patch_size: int = 4,
+        stride: int = 2,
+    ):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.patch_size = patch_size
+        self.stride = stride
+        
+        # Note: stride and kernel size are swapped vs OverlappingEmbed.
+        self.conv1 = nn.ConvTranspose2d(
+            in_channels=embed_dim,
+            out_channels=out_channels,
+            kernel_size=2,
+            stride=2
+        )
+        self.conv2 = nn.ConvTranspose2d(
+            in_channels=in_channels,
+            out_channels=embed_dim,
+            kernel_size=4,
+            stride=2,
+        )
+        
+        self.norm = nn.InstanceNorm2d(out_channels, affine=True)
+        self.act = nn.GELU()
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv1(x)
+        x = self.norm(x)
+        x = self.act(x)
+        x = self.conv2(x)
+        return x

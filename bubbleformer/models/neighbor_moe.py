@@ -7,7 +7,7 @@ from torch.profiler import record_function
 
 from bubbleformer.layers import (
     HMLPEmbed, 
-    HMLPDebed, 
+    HMLPDebed,
     FiLMMLP,
     TransformerMoEBlock
 )
@@ -37,7 +37,7 @@ class NeighborMoE(nn.Module):
             in_channels=input_fields,
             embed_dim=embed_dim,
         )
-
+        
         self.film_embed = FiLMMLP(num_fluid_params, embed_dim)
         
         self.blocks = nn.ModuleList([

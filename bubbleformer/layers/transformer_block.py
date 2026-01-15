@@ -73,7 +73,7 @@ class TransformerMoEBlock(TransformerBlock):
             intermediate = x.clone()
             with record_function("mlp"):
                 moe_output: TopkMoEOutput = self.mlp(x)
-                x = moe_output.tokens
+                x = moe_output.out
             with record_function("post_norm"):
                 x = self.post_norm(x) + intermediate
 
