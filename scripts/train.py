@@ -13,7 +13,7 @@ from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from lightning.pytorch.callbacks import ModelSummary, Callback
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
-from bubbleformer.data import BubbleForecast, VariableInputBubbleForecast
+from bubbleformer.data import BubbleForecast, VariableInputBubbleForecast, collate_random_variable
 from bubbleformer.modules import ForecastModule, ConditionedForecastModule
 from bubbleformer.models.axial_vit import SpaceTimeBlock
 
@@ -135,9 +135,9 @@ def main(cfg: DictConfig) -> None:
         )
     else:
         logger = CSVLogger(save_dir=params["log_dir"])
-
-    # ---- Datasets / normalization ----
+    
     """
+    # ---- Datasets / normalization ----
     train_dataset = BubbleForecast(
         filenames=cfg.data_cfg.train_paths,
         input_fields=cfg.data_cfg.input_fields,
@@ -164,7 +164,7 @@ def main(cfg: DictConfig) -> None:
 
     diff_term, div_term = normalization_constants
     """
-
+    print("making dataset")
     train_dataset = VariableInputBubbleForecast(
         filenames=cfg.data_cfg.train_paths,
         input_fields=cfg.data_cfg.input_fields,
@@ -194,6 +194,7 @@ def main(cfg: DictConfig) -> None:
     val_dataset.normalize(*normalization_constants)
 
     diff_term, div_term = normalization_constants
+    print("done with making dataset")
 
     # ---- Dataloaders ----
     train_dataloader = DataLoader(
@@ -202,6 +203,7 @@ def main(cfg: DictConfig) -> None:
         shuffle=True,
         num_workers=8,
         pin_memory=True,
+        collate_fn=collate_random_variable
     )
     val_dataloader = DataLoader(
         val_dataset,
@@ -209,6 +211,7 @@ def main(cfg: DictConfig) -> None:
         shuffle=False,
         num_workers=4,
         pin_memory=True,
+        collate_fn=collate_random_variable
     )
 
     # ---- LightningModule (with or without conditioning) ----
@@ -242,7 +245,7 @@ def main(cfg: DictConfig) -> None:
         default_root_dir=params["log_dir"],
         # plugins=[SLURMEnvironment(requeue_signal=signal.SIGHUP)],
         enable_model_summary=True,
-        limit_train_batches=1000,
+        limit_train_batches=5000,
         limit_val_batches=25,
         num_sanity_val_steps=0,
         callbacks=[

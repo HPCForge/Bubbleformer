@@ -1,0 +1,10 @@
+name: filmavit_ssm
+params:
+  patch_size: 16
+  embed_dim: 384
+  processor_blocks: 10
+  num_heads: 6
+  drop_path: 0.2
+  attn_scale: True
+  feat_scale: True
+  num_fluid_params: 9

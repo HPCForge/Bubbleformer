@@ -48,10 +48,6 @@ class SpaceTimeBlock(nn.Module):
             feat_scale=feat_scale,
         )
 
-        self.ssm = S4D(
-            d_model=embed_dim,
-            d_state=64
-        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -64,15 +60,16 @@ class SpaceTimeBlock(nn.Module):
 
         # First do temporal attention
         x = self.temporal(x)    # (B, T, emb, H, W)
-        print("after temporal ", x.shape)
+        #print("after temporal ", x.shape)
 
         # Now do spatial attention
         x = rearrange(x, "b t emb h w -> (b t) emb h w")        # BT sequences
         x = self.spatial(x)
-        print("after spatial ", x.shape)# A spatial encoder block
+        #print("after spatial ", x.shape)# A spatial encoder block
         x = rearrange(x, "(b t) emb h w -> b t emb h w", t=t)
-        print("after spacetime block", x.shape)
+        #print("after spacetime block", x.shape)
         return x    # (B, T, emb, H, W)
+
 
 class SpaceTimeSSMBlock(nn.Module):
 
@@ -100,23 +97,23 @@ class SpaceTimeSSMBlock(nn.Module):
             attn_scale=feat_scale,
         )
 
+
         self.ssm = S4D(
             d_model=embed_dim,
             d_state=64
         )
-
+    
+    """
     def forward(self, context: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """
-        context: [B, T_ctx, C, H, W]
-        x:       [B, K,     C, H, W]  (prediction window)
-        returns: [B, K,     C, H, W]  (processed last K steps)
+        #context: [B, T_ctx, C, H, W]
+        #x:       [B, K,     C, H, W]  (prediction window)
+        #returns: [B, K,     C, H, W]  (processed last K steps)
 
-        We:
-          - concatenate context + x along time
-          - run SSM with burn-in over context tokens
-          - keep only last K timesteps
-          - run temporal & spatial attention over those K timesteps
-        """
+        #We:
+        #  - concatenate context + x along time
+        #  - run SSM with burn-in over context tokens
+        #  - keep only last K timesteps
+        #  - run temporal & spatial attention over those K timesteps
         # Concatenate context + current window
         # If T_ctx == 0, this is just x.
         x_full = torch.cat((context, x), dim=1)   # [B, T_total, C, H, W]
@@ -139,8 +136,8 @@ class SpaceTimeSSMBlock(nn.Module):
         else:
             # Proper burn-in on first L_burn tokens (no grad), then train on tail
             L_burn = L - L_tail                                       # > 0 here
-            with torch.no_grad():
-                _, state = self.ssm(x_flat[:, :, :L_burn])            # burn-in
+            #with torch.no_grad():
+            _, state = self.ssm(x_flat[:, :, :L_burn])            # burn-in
             tail = x_flat[:, :, L_burn:]                              # [B, C, L_tail]
             tail_flat, _ = self.ssm(tail, state=state)               # with grad
 
@@ -160,6 +157,108 @@ class SpaceTimeSSMBlock(nn.Module):
         y = rearrange(y, "(b t) emb h w -> b t emb h w", t=K)         # [B, K, C, H, W]
 
         return y
+   """ 
+    
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        context: [B, T_ctx, C, H, W]
+        x:       [B, K,     C, H, W]   (prediction window)
+        returns: [B, K,     C, H, W]
+
+        Design:
+          - Concatenate context + x along time.
+          - Run S4D once over the *entire* temporal sequence (per spatial location).
+          - Take the last K timesteps from the S4D output.
+          - Feed those K timesteps to temporal + spatial attention.
+        """
+
+        # -----------------------------
+        # 1. Concatenate context + x
+        # -----------------------------
+        context = x[:, :-5, :, :, :]
+        x = x[:, -5:, :, :, :]
+        B, T, C, H, W = x.shape
+        K = 5
+
+        if context is not None and context.shape[1] > 0:
+            x_full = torch.cat((context, x), dim=1)   # [B, T_total, C, H, W]
+        else:
+            x_full = x                                # [B, K, C, H, W]
+
+        B, T_total, C, H, W = x_full.shape
+
+        # -----------------------------------------
+        # 2. Reshape so S4D sees time as sequence
+        # -----------------------------------------
+        # For each spatial location (h, w), we have a length-T_total time-series.
+        # S4D (with transposed=True) expects input shape [B_eff, C, L_time].
+        x_seq = rearrange(
+            x_full,
+            "b t c h w -> (b h w) c t"
+        )  # [B*H*W, C, T_total]
+
+        # -----------------------------------------
+        # 3. Single S4D call over full time axis
+        # -----------------------------------------
+        # S4D is a pure convolution over the temporal length dim.
+        y_seq, _ = self.ssm(x_seq)   # [B*H*W, C, T_total]
+
+        # ------------------------------------------------
+        # 4. Take only the last K timesteps for prediction
+        # ------------------------------------------------
+        # These are the "transformed" versions of the last K input frames,
+        # each of which can now depend on *all* previous timesteps (context).
+        
+        y_tail = y_seq[:, :, -K:]    # [B*H*W, C, K]
+        y_pref = y_seq[:, :, :-K]
+
+        # -----------------------------------------
+        # 5. Reshape back to [B, K, C, H, W]
+        # -----------------------------------------
+
+
+        y = rearrange(
+            y_tail,
+            "(b h w) c t -> b t c h w",
+            b=B, h=H, w=W
+        )  # [B, K, C, H, W]
+        
+        y_pref = rearrange(
+            y_pref,
+            "(b h w) c t -> b t c h w",
+            b=B, h=H, w=W
+        )
+
+        # -----------------------------------------
+        # 6. Temporal attention over these K steps
+        # -----------------------------------------
+        # self.temporal is your existing temporal attention block that
+        # expects [B, K, C, H, W] and returns [B, K, C, H, W].
+        y = self.temporal(y)         # [B, K, C, H, W]
+
+        # -----------------------------------------
+        # 7. Spatial attention (per timestep)
+        # -----------------------------------------
+        # self.spatial is your existing spatial attention block that
+        # operates on [B*K, C, H, W].
+        y = rearrange(y, "b t c h w -> (b t) c h w")  # [B*K, C, H, W]
+        y = self.spatial(y)                           # [B*K, C, H, W]
+        y = rearrange(y, "(b t) c h w -> b t c h w", t=K)
+
+        return torch.cat((y_pref, y), dim=1)
+        #return y
+
+    def step(self, x: torch.Tensor, state=None):
+        B, T, C, H, W = x.shape
+
+        x_flat = rearrange(x, "b t c h w -> b c (t h w)")
+        y_flat, new_state = self.ssm(x_flat, state=state)
+
+        y = rearrange(y_flat, "b c (t h w) -> b t c h w", t=T, h=H, w=W)
+        y = self.temporal(y)
+        y = self.spatial(x)
 
 
 @register_model("avit")
@@ -289,6 +388,11 @@ class FiLMConditionedAViT(nn.Module):
             in_channels=input_fields,
             embed_dim=embed_dim,
         )
+
+        if block_type == "st":
+            BlockType = SpaceTimeBlock
+        elif block_type == "st_ssm":
+            BlockType = SpaceTimeSSMBlock
         
 
         self.film_embed = FiLMMLP(num_fluid_params, embed_dim)
@@ -296,10 +400,6 @@ class FiLMConditionedAViT(nn.Module):
         #     FiLMMLP(num_fluid_params, embed_dim) for _ in range(processor_blocks)
         # ])
         
-        if block_type == "st":
-            BlockType = SpaceTimeBlock
-        elif block_type == "st_ssm":
-            BlockType = SpaceTimeSSMBlock
 
         self.dp = np.linspace(0, drop_path, processor_blocks)
         self.blocks = nn.ModuleList([
@@ -329,12 +429,12 @@ class FiLMConditionedAViT(nn.Module):
         # Encode
         x = rearrange(x, "b t c h w -> (b t) c h w")
         x = self.embed(x)
-        print("after embedding: ", x.shape)
+        #print("after embedding: ", x.shape)
         x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
 
         # Apply FiLM conditioning on the embeddings
         x = self.film_embed(x, fluid_params)  # (B, T, C, H, W)
-        print("after film: ", x.shape)
+        #print("after film: ", x.shape)
 
         # Process with FiLM-modulated blocks
         # for blk, film in zip(self.blocks, self.film_blocks):
@@ -345,9 +445,9 @@ class FiLMConditionedAViT(nn.Module):
         # Decode
         x = rearrange(x, "b t c h w -> (b t) c h w")
         x = self.debed(x)
-        print("after debed ", x.shape)
+        #print("after debed ", x.shape)
         x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
-        print("before return ", x.shape)
+        #print("before return ", x.shape)
         return x
 
 @register_model("vmamba_filmavit")
@@ -470,17 +570,13 @@ class FiLMConditionedAViTSSM(FiLMConditionedAViT):
         x = self.film_embed(x, fluid_params)  # (B, T, C, H, W)
         # Process with FiLM-modulated blocks
         # for blk, film in zip(self.blocks, self.film_blocks):
-        
-        # we are back to [B, T, C, H, W]
-        # we need to split up the T
-        context = x[:, :-self.time_window, :, :, :]
-        x = x[:, -self.time_window:, :, :, :]
 
         for blk in self.blocks:
-            x = blk(context, x)
+            x = blk(x)
             # x = film(x, fluid_params)
 
         # Decode
+        x = x[:, -self.time_window:, :, :, :]
         x = rearrange(x, "b t c h w -> (b t) c h w")
         x = self.debed(x)
         x = rearrange(x, "(b t) c h w -> b t c h w", t=self.time_window)

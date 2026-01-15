@@ -1,1 +1,1 @@
-from .dataset import BubbleForecast, VariableInputBubbleForecast
+from .dataset import BubbleForecast, VariableInputBubbleForecast, collate_random_variable

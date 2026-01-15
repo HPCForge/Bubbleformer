@@ -2,11 +2,13 @@ import os
 import torch
 from collections import OrderedDict
 from bubbleformer.models import get_model
-from bubbleformer.data import BubbleForecast
+from bubbleformer.data import BubbleForecast, VariableInputBubbleForecast
 from bubbleformer.utils.losses import LpLoss
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+import yaml
+import sys
 
 def plot_bubbleml(
         preds: torch.Tensor,
@@ -173,7 +175,40 @@ def plot_bubbleml(
 
 
 
-test_path = ["/share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_91.hdf5"]
+config = "/data/homezvol3/srachaba/Projects/Bubbleformer/bubbleformer/config/data_cfg/poolboiling_saturated.yaml"
+with open(config, "r") as f:
+    data_cfg = yaml.safe_load(f)
+
+"""
+train_dataset = VariableInputBubbleForecast(
+    filenames=data_cfg["train_paths"][:1],
+    input_fields=data_cfg["input_fields"],
+    output_fields=data_cfg["output_fields"],
+    norm=data_cfg["normalize"],
+    downsample_factor=data_cfg["downsample_factor"],
+    max_input_window=data_cfg["input_window"],
+    pred_window=data_cfg["output_window"],
+    start_time=data_cfg["start_time"],
+    return_fluid_params=data_cfg["return_fluid_params"],
+)
+#normalization_constants = train_dataset.normalize()
+"""
+
+#test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/SingleBubble-Saturated-FC72-2D/Twall_91.hdf5"]
+test_path = data_cfg["val_paths"][:1]
+"""
+test_dataset = VariableInputBubbleForecast(
+    filenames=test_path,
+    input_fields=["dfun", "temperature", "velx", "vely"],
+    output_fields=["dfun", "temperature", "velx", "vely"],
+    norm=data_cfg["normalize"],
+    downsample_factor=1,
+    max_input_window=30,
+    pred_window=5,
+    start_time=100,
+    return_fluid_params=True,
+)
+"""
 test_dataset = BubbleForecast(
     filenames=test_path,
     input_fields=["dfun", "temperature", "velx", "vely"],
@@ -182,27 +217,51 @@ test_dataset = BubbleForecast(
     downsample_factor=1,
     time_window=5,
     start_time=100,
-    return_fluid_params=False,
+    return_fluid_params=True,
 )
+#test_dataset.normalize(*normalization_constants)
+#diff_term, dif_term = normalization_constants
 
-model_name = "avit"
+
+model_name = "filmavit_ssm"
 model_kwargs = {
             "input_fields": 4,
             "output_fields": 4,
             "time_window": 5,
             "patch_size": 16,
             "embed_dim": 384,
-            "processor_blocks": 12,
+            "processor_blocks": 2,
             "num_heads": 6,
             "drop_path": 0.2,
             "attn_scale": True,
             "feat_scale": True,
+            "num_fluid_params": 9
             }
 
+#test_dataset = train_dataset
 model = get_model(model_name, **model_kwargs)
 model = model.cuda()
 
-weights_path = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/hpc_ckpt_3.ckpt"
+#weights_path = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/hpc_ckpt_3.ckpt"
+
+#filmavit SSM trained on poolboiling saturated both liquids
+#weights_path = "/data/homezvol3/srachaba/Projects/Bubbleformer/temp/bubbleformer_logs/vmamba_film_avit_mini_poolboiling_saturated/filmavit_ssm_poolboiling_saturated_46958337/Bubbleformer/8z745ejw/checkpoints/epoch=49-step=125000.ckpt"
+
+#filmavit trained on poolboiling saturated FC72
+#weights_path = "/data/homezvol3/srachaba/Projects/Bubbleformer/temp/bubbleformer_logs/vmamba_film_avit_mini_poolboiling_saturated/vmamba_filmavit_poolboiling_saturated_46740654/Bubbleformer/hrr0l061/checkpoints/epoch=249-step=250000.ckpt"
+
+#filmavit trained on poolboiling saturated both liquids
+#weights_path = "/data/homezvol3/srachaba/Projects/Bubbleformer/temp/bubbleformer_logs/vmamba_film_avit_mini_poolboiling_saturated/filmavit_poolboiling_saturated_46987558/Bubbleformer/wl7ireh4/checkpoints/epoch=49-step=250000.ckpt"
+
+#film avit ssm both fluids with loss on context 
+#weights_path = "/data/homezvol3/srachaba/Projects/Bubbleformer/temp/bubbleformer_logs/vmamba_film_avit_mini_poolboiling_saturated/filmavit_ssm_poolboiling_saturated_46998818/Bubbleformer/y3yplof1/checkpoints/epoch=49-step=250000.ckpt"
+
+#film avit ssm both fluids with loss on context
+#weights_path = '/data/homezvol3/srachaba/Projects/Bubbleformer/temp/bubbleformer_logs/vmamba_film_avit_mini_poolboiling_saturated/filmavit_ssm_poolboiling_saturated_47027992/Bubbleformer$/c5a03jjz/checkpoints/epoch=49-step=250000.ckpt'
+
+#weights_path = "/data/homezvol3/srachaba/Projects/Bubbleformer/temp/bubbleformer_logs/vmamba_film_avit_mini_poolboiling_saturated/filmavit_ssm_poolboiling_saturated_47030709/Bubbleformer/jvff4bgp/checkpoints/epoch=49-step=250000.ckpt"
+
+weights_path = "/data/homezvol3/srachaba/Projects/Bubbleformer/temp/bubbleformer_logs/vmamba_film_avit_mini_poolboiling_saturated/filmavit_ssm_poolboiling_saturated_47091913/Bubbleformer/z5ed4dld/checkpoints/epoch=54-step=275000.ckpt"
 model_data = torch.load(weights_path, weights_only=False)
 
 diff_term = {
@@ -226,6 +285,8 @@ for key, val in model_data["state_dict"].items():
 del model_data
 
 model.load_state_dict(weight_state_dict)
+#print(list(weight_state_dict.keys()))
+#sys.exit(0)
 
 _, _ = test_dataset.normalize(diff_term, div_term)
 criterion = LpLoss(d=2, p=2, reduce_dims=[0,1], reductions=["mean", "mean"])
@@ -236,13 +297,16 @@ model_preds = []
 model_targets = []
 timesteps = []
 
-for itr in range(0, 500, skip_itrs):
-    inp, tgt = test_dataset[itr]
+"""
+for itr in range(0, 100, skip_itrs):
+    inp, tgt, fluid = test_dataset[200+itr]
     print(f"Autoreg pred {itr}, inp tw [{start_time+itr}, {start_time+itr+skip_itrs}], tgt tw [{start_time+itr+skip_itrs}, {start_time+itr+2*skip_itrs}]")
     if len(model_preds) > 0:
         inp = model_preds[-1] # T, C, H, W
     inp = inp.cuda().float().unsqueeze(0)
-    pred = model(inp)
+    fluid = fluid.cuda().float().unsqueeze(0)
+    print(fluid.shape)
+    pred = model(inp, fluid)
     pred = pred.squeeze(0).detach().cpu()
     tgt = tgt.detach().cpu()
 
@@ -250,7 +314,64 @@ for itr in range(0, 500, skip_itrs):
     model_targets.append(tgt)
     timesteps.append(torch.arange(start_time+itr+skip_itrs, start_time+itr+2*skip_itrs))
     print(criterion(pred, tgt))
+"""
 
+ctx_len = 100
+context = None        # CPU: [1, ctx_len, C, H, W]
+
+model_preds = []
+model_targets = []
+timesteps = []
+
+for itr in range(0, 100, skip_itrs):
+    # ---- Load GT input window & fluid params ----
+    inp, tgt, fluid = test_dataset[200+itr]          # inp,tgt: [K, C, H, W]
+    tgt_cpu = tgt.detach().cpu()                 # [K, C, H, W]  (keep on CPU)
+
+    inp   = inp.unsqueeze(0).cuda(non_blocking=True).float()    # [1, K, C, H, W]
+    fluid = fluid.unsqueeze(0).cuda(non_blocking=True).float()  # [1, num_params]
+    if len(model_preds) > 0:
+        inp = model_preds[-1].unsqueeze(0).cuda().float()
+    # ---- Build combined [B, T_total, C, H, W] on GPU ----
+    if context is not None:
+        ctx_gpu = context.to(inp.device, non_blocking=True)     # [1, ctx_len, C, H, W]
+        combined = torch.cat([ctx_gpu, inp], dim=1)# [1, ctx_len+K, C, H, W]
+        del ctx_gpu
+    else:
+        combined = inp                                          # [1, K, C, H, W]
+
+    # ---- Run model (no grad) ----
+    with torch.no_grad():
+        print(combined.shape, " combined")
+        pred = model(combined, fluid)[0]                        # [K, C, H, W]
+
+    # ---- Store results on CPU ----
+    pred_cpu = pred.detach().cpu()                              # [K, C, H, W]
+    model_preds.append(pred_cpu)
+    model_targets.append(tgt_cpu)
+    timesteps.append(torch.arange(start_time + itr,
+                                  start_time + itr + skip_itrs))  # [K]
+    
+    tgt = tgt.cuda()
+    loss = criterion(pred, tgt)
+    print(pred.shape, tgt.shape, loss.item())
+    #continue
+    # ---- Update context on CPU ----
+    if context is None:
+        new_ctx = pred_cpu.unsqueeze(0)                         # [1, K, C, H, W]
+    else:
+        new_ctx = torch.cat([context, pred_cpu.unsqueeze(0)], dim=1)
+
+    if new_ctx.size(1) > ctx_len:
+        context = new_ctx[:, -ctx_len:]                         # [1, ctx_len, C, H, W]
+    else:
+        context = new_ctx
+
+    # ---- Clean up GPU tensors ----
+    del combined, pred, inp, fluid
+    torch.cuda.empty_cache()
+
+sys.exit(0)
 model_preds = torch.cat(model_preds, dim=0)         # T, C, H, W
 model_targets = torch.cat(model_targets, dim=0)     # T, C, H, W
 timesteps = torch.cat(timesteps, dim=0)             # T,
@@ -259,7 +380,8 @@ num_var = len(test_dataset.fields)                  # C
 # preds = model_preds * div_term.view(1, num_var, 1, 1) + diff_term.view(1, num_var, 1, 1)     # denormalize
 # targets = model_targets * div_term.view(1, num_var, 1, 1) + diff_term.view(1, num_var, 1, 1) # denormalize
 
-save_dir = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/epoch_327_outputs/fc_91"
+#save_dir = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/epoch_327_outputs/fc_91"
+save_dir = "/pub/srachaba/Projects/Bubbleformer/temp/vis"
 os.makedirs(save_dir, exist_ok=True)
 save_path = os.path.join(save_dir, "predictions.pt")
 torch.save({"preds": model_preds, "targets": model_targets, "timesteps": timesteps}, save_path)

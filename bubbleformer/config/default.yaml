@@ -4,21 +4,22 @@ seed: 42
 nodes: 1
 devices: 1
 
-max_epochs: 250
-batch_size: 1
+max_epochs: 40
+batch_size: 2
 
-checkpoint_path:
+checkpoint_path: 
 
 use_wandb: True
 wandb_tags:
   - time_window-5
   - relative_l2_loss
-  - FiLM-AViT-SSM-Mini
+  - FiLM-AViT-SSM-Small
   - Poolboiling-Saturated
   - Lion_optimizer
+  - Context_length-30
 defaults:
   - _self_
   - data_cfg: poolboiling_saturated
-  - model_cfg: film_avit_ssm_mini
+  - model_cfg: film_avit_ssm_small
   - optim_cfg: lion
   - scheduler_cfg: cosine_warmup
