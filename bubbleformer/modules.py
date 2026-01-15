@@ -1,3 +1,4 @@
+import random
 import time
 from typing import Tuple, Optional, List
 
@@ -350,12 +351,24 @@ class MoEConditionedForecastModule(ConditionedForecastModule):
         batch_idx: int
     ) -> torch.Tensor:
         inp, tgt, cond = batch
+
+        # The input is [B, T, C, H, W]
+        # Randomly flip along the horizontal axis of the input and target.
+        if random.random() < 0.5:
+            inp = torch.flip(inp, dims=[-1])
+            tgt = torch.flip(tgt, dims=[-1])
+
+        # Add gaussian noise to the input
+        if random.random() < 0.4:
+            scale = random.choice([0.01, 0.05, 0.1, 0.5, 1])
+            inp = inp + torch.normal(0, scale, inp.shape, device=inp.device)
+
         pred, moe_outputs = self.model(inp, cond)
-        
+
         data_loss = self.criterion(pred, tgt)
         routing_loss = sum(moe_output.load_balance_loss for moe_output in moe_outputs)
         loss = data_loss + routing_loss
-        
+
         self.default_log_dict({
             "train_loss": loss,
             "train_data_loss": data_loss,
