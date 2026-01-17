@@ -171,9 +171,17 @@ def plot_bubbleml(
         if i % 25 == 0:
             print(f"{i} files done")
 
+weights_path = "/pub/sheikhh1/bubbleformer_logs/scot_poolboiling_saturated_47041557/epoch_104.ckpt"
+model_data = torch.load(weights_path, map_location="cuda", weights_only=False)
+model_name = model_data["hyper_parameters"]["model_cfg"]["name"]
+model_params = dict(model_data["hyper_parameters"]["model_cfg"]["params"])
 
+model_params["input_fields"] = len(model_data["hyper_parameters"]["data_cfg"]["input_fields"])
+model_params["output_fields"] = len(model_data["hyper_parameters"]["data_cfg"]["output_fields"])
+model_params["time_window"] = model_data["hyper_parameters"]["data_cfg"]["time_window"]
+model = get_model(model_name, **model_params)
 
-test_path = ["/share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_91.hdf5"]
+test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-FC72-2D/Twall_91.hdf5"]
 test_dataset = BubbleForecast(
     filenames=test_path,
     input_fields=["dfun", "temperature", "velx", "vely"],
@@ -184,41 +192,9 @@ test_dataset = BubbleForecast(
     start_time=100,
     return_fluid_params=False,
 )
+diff_term, div_term = model_data['hyper_parameters']['normalization_constants']
+_, _ = test_dataset.normalize(diff_term, div_term)
 
-model_name = "avit"
-model_kwargs = {
-            "input_fields": 4,
-            "output_fields": 4,
-            "time_window": 5,
-            "patch_size": 16,
-            "embed_dim": 384,
-            "processor_blocks": 12,
-            "num_heads": 6,
-            "drop_path": 0.2,
-            "attn_scale": True,
-            "feat_scale": True,
-            }
-
-model = get_model(model_name, **model_kwargs)
-model = model.cuda()
-
-weights_path = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/hpc_ckpt_3.ckpt"
-model_data = torch.load(weights_path, weights_only=False)
-
-diff_term = {
-    "dfun": 0.0,
-    "temperature": 0.0,
-    "velx": 0.0,
-    "vely": 0.0,
-}
-div_term = {
-    "dfun": 1.0,
-    "temperature": 1.0,
-    "velx": 1.0,
-    "vely": 1.0,
-}
-# diff_term = torch.tensor(diff_term)
-# div_term = torch.tensor(div_term)
 weight_state_dict = OrderedDict()
 for key, val in model_data["state_dict"].items():
     name = key[6:]
@@ -226,8 +202,8 @@ for key, val in model_data["state_dict"].items():
 del model_data
 
 model.load_state_dict(weight_state_dict)
+model = model.cuda()
 
-_, _ = test_dataset.normalize(diff_term, div_term)
 criterion = LpLoss(d=2, p=2, reduce_dims=[0,1], reductions=["mean", "mean"])
 model.eval()
 start_time = test_dataset.start_time
@@ -236,7 +212,7 @@ model_preds = []
 model_targets = []
 timesteps = []
 
-for itr in range(0, 500, skip_itrs):
+for itr in range(0, 200, skip_itrs):
     inp, tgt = test_dataset[itr]
     print(f"Autoreg pred {itr}, inp tw [{start_time+itr}, {start_time+itr+skip_itrs}], tgt tw [{start_time+itr+skip_itrs}, {start_time+itr+2*skip_itrs}]")
     if len(model_preds) > 0:
@@ -256,12 +232,8 @@ model_targets = torch.cat(model_targets, dim=0)     # T, C, H, W
 timesteps = torch.cat(timesteps, dim=0)             # T,
 num_var = len(test_dataset.fields)                  # C
 
-# preds = model_preds * div_term.view(1, num_var, 1, 1) + diff_term.view(1, num_var, 1, 1)     # denormalize
-# targets = model_targets * div_term.view(1, num_var, 1, 1) + diff_term.view(1, num_var, 1, 1) # denormalize
-
-save_dir = "/pub/sheikhh1/bubbleformer_logs/avit_singlebubble_saturated_38080061/epoch_327_outputs/fc_91"
+save_dir = "/pub/sheikhh1/bubbleformer_logs/scot_poolboiling_saturated_47041557/epoch_104_outputs/fc_91"
 os.makedirs(save_dir, exist_ok=True)
 save_path = os.path.join(save_dir, "predictions.pt")
 torch.save({"preds": model_preds, "targets": model_targets, "timesteps": timesteps}, save_path)
 plot_bubbleml(model_preds, model_targets, timesteps, save_dir)
-

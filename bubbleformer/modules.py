@@ -13,7 +13,8 @@ import lightning as L
 from bubbleformer.models import get_model
 from bubbleformer.utils.losses import LpLoss
 from bubbleformer.utils.lr_schedulers import CosineWarmupLR
-from bubbleformer.utils.plot_utils import wandb_sdf_plotter, wandb_temp_plotter, wandb_vel_plotter
+from bubbleformer.utils.plot_utils import wandb_sdf_plotter, wandb_rho_plotter, \
+      wandb_temp_plotter, wandb_vel_plotter
 
 
 class ForecastModule(L.LightningModule):
@@ -210,6 +211,17 @@ class ForecastModule(L.LightningModule):
                 wandb.log({
                     "Target SDF": wandb.Image(target_sdfs, caption=f"Epc {self.current_epoch}"),
                     "Prediction SDF": wandb.Image(pred_sdfs, caption=f"Epc {self.current_epoch}"),
+                })
+
+            except ValueError:
+                pass
+            try:
+                rho_idx = fields.index("rho")
+                target_rhos = wandb_rho_plotter(target_sample[:,rho_idx,:,:])
+                pred_rhos = wandb_rho_plotter(pred_sample[:,rho_idx,:,:])
+                wandb.log({
+                    "Target Rho": wandb.Image(target_rhos, caption=f"Epc {self.current_epoch}"),
+                    "Prediction Rho": wandb.Image(pred_rhos, caption=f"Epc {self.current_epoch}"),
                 })
 
             except ValueError:

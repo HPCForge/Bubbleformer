@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.checkpoint as cp
 import numpy as np
 from einops import rearrange
@@ -7,7 +8,7 @@ from einops import rearrange
 from bubbleformer.layers import AxialAttentionBlock, AttentionBlock, HMLPEmbed, HMLPDebed, FiLMMLP
 from ._api import register_model
 
-__all__ = ["AViT"]
+__all__ = ["AViT", "FiLMConditionedAViT"]
 
 
 class SpaceTimeBlock(nn.Module):
@@ -97,6 +98,7 @@ class AViT(nn.Module):
     ):
         super().__init__()
         self.drop_path = drop_path
+        self.patch_size = patch_size
         self.dp = np.linspace(0, drop_path, processor_blocks)
         # Hierarchical Patch Embedding
         self.embed = HMLPEmbed(
@@ -131,10 +133,18 @@ class AViT(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape (B, T, C, H, W)
         """
-        _, t, _, _, _ = x.shape
+        b, t, c, H, W = x.shape
+
+        # --- Pad H/W to be divisible by patch size ---
+        p = self.patch_size
+        pad_h = (-H) % p  # amount to add on bottom
+        pad_w = (-W) % p  # amount to add on right
 
         # Encode
         x = rearrange(x, "b t c h w -> (b t) c h w")
+        if pad_h or pad_w:
+            # F.pad pads as (left, right, top, bottom)
+            x = F.pad(x, (0, pad_w, 0, pad_h), mode="constant", value=0)
         x = self.embed(x)
         x = rearrange(x, "(b t) c h w -> b t c h w", t=t)
 
@@ -146,6 +156,12 @@ class AViT(nn.Module):
         # Decode
         x = rearrange(x, "b t c h w -> (b t) c h w")
         x = self.debed(x)
+
+        # --- Crop back to original H/W ---
+        Hp = H + pad_h
+        Wp = W + pad_w
+        if pad_h or pad_w:
+            x = x[:, :, :Hp - pad_h if pad_h else Hp, :Wp - pad_w if pad_w else Wp]
         x = rearrange(x, "(b t) c h w -> b t c h w", t=t)
 
         return x  # Temporal bundling (B, T, C, H, W)
