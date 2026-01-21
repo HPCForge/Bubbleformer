@@ -4,13 +4,17 @@ from collections import OrderedDict
 from bubbleformer.models import get_model
 from bubbleformer.data import BubbleForecast
 from bubbleformer.utils.losses import LpLoss
+from bubbleformer.layers.moe.topk_moe import TopkMoEOutput
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+from typing import List
+from bubbleformer.utils.moe_metrics import topk_indices_to_patch_expert_counts
 
 def plot_bubbleml(
         preds: torch.Tensor,
         targets: torch.Tensor,
+        topk_indices: List[List[TopkMoEOutput]],
         timesteps: torch.Tensor,
         save_dir: str,
     ):
@@ -20,6 +24,7 @@ def plot_bubbleml(
     Args:
         preds: Predictions from the model for a single rollout (T, 4, H, W)
         targets: Ground truth targets for a single rollout (T, 4, H, W)
+        topk_indices: MoE routing for a every step of a rollout (T, H, W, topk)
         timesteps: Timesteps for the predictions for a single rollout (T,)
         save_dir: Directory to save the plots
     """
@@ -53,13 +58,29 @@ def plot_bubbleml(
     vel_min, vel_max = round(vel_mean - 3 * vel_std, 2), round(vel_mean + 3 * vel_std, 2)
 
     temp_mean, temp_std = torch.mean(targets[:, 1]).item(), torch.std(targets[:, 1]).item()
-    temp_min, temp_max = -30, 30 #58.0, 92.0
+    temp_min, temp_max = targets[:, 1].min().item(), targets[:, 1].max().item() #-28, 30 
+    #temp_min, temp_max = 50.0, 100.0
 
     sdf_mean, sdf_std = torch.mean(targets[:, 0]).item(), torch.std(targets[:, 0]).item()
     sdf_min, sdf_max = round(sdf_mean - 3 * sdf_std, 2), round(sdf_mean + 3 * sdf_std, 2)
+    
+    # (num_experts, T, H, W)
+    patch_expert_counts = topk_indices_to_patch_expert_counts(
+        topk_indices, topk_indices.max().item() + 1)
+    patch_expert0_counts = patch_expert_counts[1] # (T, H, W)
 
     for i in range(preds.shape[0]):
+        
         i_str = str(i).zfill(4)
+        
+        patch_expert0_count_at_i = patch_expert0_counts[i] # (H, W)
+        
+        # interpolate the patch expert counts to the full grid, so we can plot it
+        patch_expert0_count_at_i = torch.nn.functional.interpolate(
+            patch_expert0_count_at_i.unsqueeze(0).unsqueeze(0).to(torch.float32),
+            size=(preds.shape[2], preds.shape[3]),
+            mode="nearest"
+        ).squeeze().to(torch.int32).detach().cpu().numpy()
 
         sdf_pred = preds[i, 0, :, :].numpy()
         dfun_pred = sdf_pred.copy()
@@ -89,8 +110,6 @@ def plot_bubbleml(
         temp_target = targets[i, 1, :, :].numpy()
         temp_err = np.abs(temp_target - temp_pred)/(np.abs(temp_target) + 1.0e-8)
 
-        print(temp_pred.min(), temp_pred.max(), temp_target.min(), temp_target.max())
-
         velx_pred = preds[i, 2, :, :].numpy()
         velx_target = targets[i, 2, :, :].numpy()
         vely_pred = preds[i, 3, :, :].numpy()
@@ -109,7 +128,6 @@ def plot_bubbleml(
         velx_target[dfun_target==0] = 0
         vely_target[dfun_target==0] = 0
 
-
         f, axarr = plt.subplots(2, 3, figsize=(15, 10), layout="constrained")
         im_00 = axarr[0][0].imshow(sdf_target, vmin=sdf_min, vmax=sdf_max, cmap="Blues", origin="lower")
         #axarr[0][0].imshow(target_overlay, alpha=1, origin="lower")
@@ -126,7 +144,7 @@ def plot_bubbleml(
 
         im_02 = axarr[0][2].imshow(np.flipud(velmag_target), vmin=vel_min, vmax=vel_max, cmap="turbo")
         #im_02 = axarr[0][2].imshow(np.flipud(velmag_target), cmap="turbo")
-        axarr[0][2].streamplot(X, Y, np.flipud(velx_target)[10:-10, 10:-10], -np.flipud(vely_target)[10:-10, 10:-10], density=0.75, color="white")
+        #axarr[0][2].streamplot(X, Y, np.flipud(velx_target)[10:-10, 10:-10], -np.flipud(vely_target)[10:-10, 10:-10], density=0.75, color="white")
         #axarr[0][2].imshow(np.flipud(target_overlay), alpha=1)
         axarr[0][2].axis("off")
         plt.colorbar(im_02, ax=axarr[0][2], fraction=0.04, pad=0.05)
@@ -139,6 +157,9 @@ def plot_bubbleml(
         axarr[1][0].set_title(f"SDF Pred {i}")
 
         im_11 = axarr[1][1].imshow(temp_pred, vmin=temp_min, vmax=temp_max, origin="lower")
+        # NOTE: Overlay MoE expert counts on top of the temperature prediction
+        axarr[1][1].imshow(patch_expert0_count_at_i, alpha=0.3, origin="lower")
+
         #im_11 = axarr[1][1].imshow(temp_pred, cmap="turbo", origin="lower")
         #axarr[1][1].imshow(pred_overlay, alpha=1, origin="lower")
         axarr[1][1].axis("off")
@@ -147,26 +168,11 @@ def plot_bubbleml(
 
         im_12 = axarr[1][2].imshow(np.flipud(velmag_pred), vmin=vel_min, vmax=vel_max, cmap="turbo")
         #im_12 = axarr[1][2].imshow(np.flipud(velmag_pred), cmap="turbo")
-        axarr[1][2].streamplot(X, Y, np.flipud(velx_pred)[10:-10, 10:-10], -np.flipud(vely_pred)[10:-10, 10:-10], density=0.75, color="white")
+        #axarr[1][2].streamplot(X, Y, np.flipud(velx_pred)[10:-10, 10:-10], -np.flipud(vely_pred)[10:-10, 10:-10], density=0.75, color="white")
         #axarr[1][2].imshow(np.flipud(pred_overlay), alpha=1)
         axarr[1][2].axis("off")
         plt.colorbar(im_12, ax=axarr[1][2], fraction=0.04, pad=0.05)
         axarr[1][2].set_title(f"Vel Pred {i}")
-
-        #im_20 = axarr[2][0].imshow(dfun_err, vmin=0, vmax=1, cmap="Blues", origin="lower")
-        #axarr[2][0].axis("off")
-        #axarr[2][0].set_title(f"Rel Dfun L1 error {i}")
-        #f.colorbar(im_20, ax=axarr[2, 0], fraction=0.04, pad=0.05)
-
-        #im_21 = axarr[2][1].imshow(temp_err, vmin=0, vmax=1, cmap="turbo", origin="lower")
-        #axarr[2][1].axis("off")
-        #axarr[2][1].set_title(f"Rel Temp L1 error {i}")
-        #f.colorbar(im_21, ax=axarr[2, 1], fraction=0.04, pad=0.05)
-
-        #im_22 = axarr[2][2].imshow(velmag_err, vmin=0, vmax=1, cmap="turbo", origin="lower")
-        #axarr[2][2].axis("off")
-        #axarr[2][2].set_title(f"Rel Vel L1 error {i}")
-        #f.colorbar(im_22, ax=axarr[2][2], fraction=0.04, pad=0.05)
 
         plt.savefig(
             f"{str(plot_dir)}/{i_str}.png",
@@ -176,12 +182,17 @@ def plot_bubbleml(
         if i % 25 == 0:
             print(f"{i}/{preds.shape[0]} files done")
 
-
 torch.set_float32_matmul_precision("high")
 
-#test_path = ["/share/crsp/lab/amowli/share/Bubbleformer/SingleBubble-Saturated-FC72-2D/Twall_91.hdf5"]
 #test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-FC72-2D/Twall_97.hdf5"]
-test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-R515B-2D/Twall_30.hdf5"]
+#test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-R515B-2D/Twall_30.hdf5"]
+test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-LN2-2D/Twall_-165.hdf5"]
+
+#test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-FC72-2D/Twall_91.hdf5"]
+#test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-R515B-2D/Twall_18.hdf5"]
+#test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-LN2-2D/Twall_-176.hdf5"]
+
+
 
 test_dataset = BubbleForecast(
     filenames=test_path,
@@ -195,7 +206,7 @@ test_dataset = BubbleForecast(
 )
 
 # TODO: This should all be written/read to/from a config file with the checkpoints
-model_name = "filmavit"
+model_name = "neighbor_moe"
 model_kwargs = {
     "input_fields": 4,
     "output_fields": 4,
@@ -204,20 +215,19 @@ model_kwargs = {
     "embed_dim": 384,
     "processor_blocks": 6,
     "num_heads": 6,
-    "drop_path": 0.2,
-    "attn_scale": True,
-    "feat_scale": True,
+    "num_experts": 6,
+    "topk": 2,
+    "load_balance_loss_weight": 0.01,
     "num_fluid_params": 9,
 }
 
 model = get_model(model_name, **model_kwargs)
 model = model.cuda()
 
-#weights_path = "model-zoo/Bubbleformer-S-PB-Subcooled.ckpt" 
-#weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47070126/lightning_logs/version_0/checkpoints/epoch=9-step=75680.ckpt"
-#weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47209045/lightning_logs/version_0/checkpoints/epoch=0-step=6000.ckpt"
-#weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47219168/lightning_logs/version_0/checkpoints/epoch=4-step=9460.ckpt"
-weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47238340/checkpoints/epoch=29-step=56760.ckpt"
+#weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47238340/checkpoints/epoch=29-step=56760.ckpt"
+#weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47407258/checkpoints/epoch=34-step=132440.ckpt"
+#weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47512802/checkpoints/last.ckpt"
+weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47609426/checkpoints/last.ckpt"
 model_data = torch.load(weights_path, weights_only=False)
 
 diff_term = {
@@ -254,15 +264,18 @@ model_preds = []
 model_targets = []
 timesteps = []
 
-for itr in range(0, len(test_dataset), skip_itrs):
+moe_outputs = []
+
+for itr in range(0, 100, skip_itrs):
     inp, tgt, fluid_params = test_dataset[itr]
     print(f"Autoreg pred {itr}, inp tw [{start_time+itr}, {start_time+itr+skip_itrs}], tgt tw [{start_time+itr+skip_itrs}, {start_time+itr+2*skip_itrs}]")
     if len(model_preds) > 0:
         inp = model_preds[-1] # T, C, H, W
     inp = inp.cuda().to(torch.float32).unsqueeze(0)
     fluid_params = fluid_params.cuda().to(torch.float32).unsqueeze(0)
-    
-    pred = model(inp, fluid_params)
+
+    pred, moe_output = model(inp, fluid_params)
+    moe_outputs.append(moe_output[0]) # NOTE: tracking first layer of MoE outputs
 
     pred = pred.to(torch.float32)
     pred = pred.squeeze(0).detach().cpu()
@@ -277,11 +290,15 @@ model_targets = torch.cat(model_targets, dim=0)     # T, C, H, W
 timesteps = torch.cat(timesteps, dim=0)             # T,
 num_var = len(test_dataset.fields)                  # C
 
-save_dir = "./subcooled_fc72_97"
-print(f"saving to {save_dir}")
+topk_indices = [moe_output.topk_indices.squeeze(0) for moe_output in moe_outputs]
+topk_indices = torch.cat(topk_indices, dim=0) # (T, H, W, topk)
 
-os.makedirs(save_dir, exist_ok=True)
-save_path = os.path.join(save_dir, "predictions.pt")
-torch.save({"preds": model_preds, "targets": model_targets, "timesteps": timesteps}, save_path)
-plot_bubbleml(model_preds, model_targets, timesteps, save_dir)
 
+
+#save_dir = "./subcooled_fc72_97"
+#print(f"saving to {save_dir}")
+
+#os.makedirs(save_dir, exist_ok=True)
+#save_path = os.path.join(save_dir, "predictions.pt")
+#torch.save({"preds": model_preds, "targets": model_targets, "timesteps": timesteps}, save_path)
+#plot_bubbleml(model_preds, model_targets, topk_indices, timesteps, save_dir)
