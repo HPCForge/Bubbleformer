@@ -11,10 +11,8 @@ import cv2
 import numpy as np
 from bubbleformer.utils.moe_metrics import topk_indices_to_patch_expert_counts
 from bubbleformer.utils.physical_metrics import (
-    vorticity, 
-    eikonal, 
-    vapor_volume,
-    find_bubbles
+    physical_metrics,
+    bubble_metrics
 )
 
 torch.set_float32_matmul_precision("high")
@@ -63,12 +61,13 @@ print(model)
 
 def run_test(model, test_file_path: str, max_timesteps: int):
 
+    downsample_factor = 8
     test_dataset = BubbleForecast(
         filenames=[test_file_path],
         input_fields=["dfun", "temperature", "velx", "vely"],
         output_fields=["dfun", "temperature", "velx", "vely"],
         norm="none",    
-        downsample_factor=8,
+        downsample_factor=downsample_factor,
         time_window=5,
         start_time=100,
         return_fluid_params=True,
@@ -113,27 +112,35 @@ def run_test(model, test_file_path: str, max_timesteps: int):
     sdf_target = targets[:, :, 0, :, :]
     sdf_pred = preds[:, :, 0, :, :]
     
-    norm = TwoSlopeNorm(vcenter=0)
-    plt.imshow(sdf_target[0, 0, :, :], cmap="icefire", norm=norm, origin="lower")
-    plt.savefig("sdf.png")
-    plt.close()
+    #norm = TwoSlopeNorm(vcenter=0)
+    #plt.imshow(sdf_target[0, 0, :, :], cmap="icefire", norm=norm, origin="lower")
+    #plt.savefig("sdf.png")
+    #plt.close()
     
-    bubbles = find_bubbles(sdf_target)[0, 50]
-    plt.imshow(bubbles, cmap=plt.cm.nipy_spectral, origin="lower")
-    plt.savefig("bubbles.png")
-    plt.close()
+    #bubbles = find_bubbles(sdf_target)[0, 50]
+    #plt.imshow(bubbles, cmap=plt.cm.nipy_spectral, origin="lower")
+    #plt.savefig("bubbles.png")
+    #plt.close()å
     
     print("-"*100)
     print(f"Rollout Statistics on {test_file_path}:")
-    print(f"1. Time-Averaged Eikonal Equation Error:")
-    print(f"    Target: {eikonal(sdf_target, dx=1/32).min().item()}")
-    print(f"    Pred: {eikonal(sdf_pred, dx=1/32).min().item()}")
-    print(f"2. Time-Averaged Vapor Volume:")
-    print(f"    Target: {vapor_volume(sdf_target, dx=1/4).mean().item()}")
-    print(f"    Pred: {vapor_volume(sdf_pred, dx=1/4).mean().item()}")
-    #print(f"3. Time-Averaged Bubble Count:")
-    #print(f"    Target: {estimate_bubble_count(sdf_target).mean().item()}")
-    #print(f"    Pred: {estimate_bubble_count(sdf_pred).mean().item()}")
+    dx = 1/32 * downsample_factor
+    dy = dx
+    p = physical_metrics(
+        preds[:, :, 0], 
+        preds[:, :, 1], 
+        preds[:, :, 2], 
+        preds[:, :, 3],
+        # TODO: get these from dataset
+        heater_min=-5.25,
+        heater_max=5.25,
+        xcoords=torch.linspace(-8 + dx / 2, 8 - dx / 2, 512 // downsample_factor), 
+        dx=dx, 
+        dy=dy
+    )
+    b = bubble_metrics(sdf_target, preds[:, :, 2], preds[:, :, 3], dx=dx, dy=dy)
+    print(p)
+    print(b)
     
 for test_file_path in test_paths:
     run_test(model, test_file_path, max_timesteps=100)
