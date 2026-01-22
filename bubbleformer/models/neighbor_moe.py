@@ -71,7 +71,7 @@ class NeighborMoE(nn.Module):
             x = rearrange(x, "b t c h w -> (b t) c h w")
             x = self.embed(x)
             x = rearrange(x, "(b t) c h w -> b t c h w", t=T)
-            
+
         embed = x.clone()
 
         # Permute to better order for attention (B, T, H, W, C)

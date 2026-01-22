@@ -6,11 +6,14 @@ from dataclasses import dataclass
 
 @dataclass
 class TopkMoEOutput:
-    tokens: torch.Tensor
+    out: torch.Tensor
     router_logits: torch.Tensor
-    counts: torch.Tensor
+    tokens_per_expert: torch.Tensor
+    topk_indices: torch.Tensor
     load_balance_loss: torch.Tensor
-
+    topk: int
+    num_experts: int
+    
 def load_balance_loss(
     router_logits: torch.Tensor,
     expert_counts: torch.Tensor,
@@ -43,11 +46,11 @@ def get_token_indices(
         flat_expert_indices = topk_expert_indices.view(-1)
         # The argsort returns int64 indices, but we don't need more than 32 bits for the indices.
         indices = flat_expert_indices.argsort().to(torch.int32)
-        counts = torch.histc(flat_expert_indices, min=0, max=num_experts - 1, bins=num_experts)
+        tokens_per_expert = torch.histc(flat_expert_indices, min=0, max=num_experts - 1, bins=num_experts)
         # group indices initialized like this to use int32.
-        group_indices = torch.empty(counts.size(0), dtype=torch.int32, device=topk_expert_indices.device)
-        torch.cumsum(counts, dim=0, out=group_indices)
-        return group_indices, indices, counts
+        group_indices = torch.empty(tokens_per_expert.size(0), dtype=torch.int32, device=topk_expert_indices.device)
+        torch.cumsum(tokens_per_expert, dim=0, out=group_indices)
+        return group_indices, indices, tokens_per_expert
 
 class TopkMoE(nn.Module):
     def __init__(
@@ -77,6 +80,14 @@ class TopkMoE(nn.Module):
             self.router.weight.data.normal_(0, 0.02)
 
     def forward(self, x):
+        r"""
+        This assumes that the input tensor is of shape (B, T, H, W, C).
+        This is done so we can track the routing statistics for each patch and time step.
+        """
+        assert x.dim() == 5, "Input tensor must be of shape (B, T, H, W, C)"
+        B, T, H, W, C = x.shape
+        
+        # flatten x because the MoE is applied to each patch independently.
         input_shape = x.shape
         x = x.view(-1, input_shape[-1])
         batch_size = x.shape[0]
@@ -84,7 +95,7 @@ class TopkMoE(nn.Module):
         router_logits = self.router(x)
         router_probs = F.softmax(router_logits, dim=-1)
         topk_probs, topk_indices = torch.topk(router_probs, k=self.topk, dim=-1)
-        group_indices, indices, counts = get_token_indices(topk_indices, self.num_experts)
+        group_indices, indices, tokens_per_expert = get_token_indices(topk_indices, self.num_experts)
         
         # Map tokens into groups based on their assigned experts
         groups = x[indices // self.topk]
@@ -102,6 +113,14 @@ class TopkMoE(nn.Module):
         # reduce the output tokens and scale by the routing probability
         out = (scattered * topk_probs.unsqueeze(-1)).sum(dim=1).view(input_shape)
         
-        loss = load_balance_loss(router_logits, counts, self.topk, self.num_experts) * self.load_balance_loss_weight
+        loss = load_balance_loss(router_logits, tokens_per_expert, self.topk, self.num_experts) * self.load_balance_loss_weight
         
-        return TopkMoEOutput(out, router_logits, counts, loss)
+        return TopkMoEOutput(
+            out=out, 
+            router_logits=router_logits, # (num_tokens, num_experts)
+            tokens_per_expert=tokens_per_expert.detach().clone(), # (num_experts,)
+            topk_indices=topk_indices.view(B, T, H, W, self.topk).detach().clone(),
+            load_balance_loss=loss, # (1,)
+            topk=self.topk,
+            num_experts=self.num_experts,
+        )
