@@ -1,11 +1,22 @@
 from typing import List, Optional, Tuple, Dict
 import json
-
+import dataclasses
 import numpy as np
 import h5py as h5
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+
+@dataclasses.dataclass
+class Data:
+    input: torch.Tensor
+    target: torch.Tensor
+    fluid_params_tensor: torch.Tensor
+    fluid_params_dict: Dict[str, float]
+    x_grid: torch.Tensor
+    y_grid: torch.Tensor
+    dx: torch.Tensor
+    dy: torch.Tensor
 
 class DownsampledBubbleForecast(Dataset):
     """
@@ -147,12 +158,14 @@ class DownsampledBubbleForecast(Dataset):
         for field in self.input_fields:
             data_item = torch.tensor(self.data[file_idx][field][inp_slice])                
             inp_data.append(
-                (data_item - self.diff_terms[field]) / self.div_terms[field]
+                data_item
+                #(data_item - self.diff_terms[field]) / self.div_terms[field]
             )
         for field in self.output_fields:
             data_item = torch.tensor(self.data[file_idx][field][out_slice])
             out_data.append(
-                (data_item - self.diff_terms[field]) / self.div_terms[field]
+                data_item
+                #(data_item - self.diff_terms[field]) / self.div_terms[field]
             )
 
         inp_data = torch.stack(inp_data) # (in_C, T, H, W)
@@ -169,13 +182,22 @@ class DownsampledBubbleForecast(Dataset):
                     fluid_params["thcogas"],
                     fluid_params["stefan"],
                     fluid_params["prandtl"],
-                    fluid_params["heater"]["nucWaitTime"],
                     fluid_params["heater"]["wallTemp"],
+                    fluid_params["heater"]["nucWaitTime"],
+                    fluid_params["heater"]["advAngle"],
+                    fluid_params["heater"]["velContact"],
+                    fluid_params["heater"]["xMin"],
+                    fluid_params["heater"]["xMax"],
                 ],
                 dtype=torch.float32,
             )
-            return inp_data.float().permute(1, 0, 2, 3), \
-                    out_data.float().permute(1, 0, 2, 3), \
-                    fluid_params_tensor
+            return (
+                inp_data.float().permute(1, 0, 2, 3),
+                out_data.float().permute(1, 0, 2, 3),
+                fluid_params_tensor
+            )
 
-        return inp_data.float().permute(1, 0, 2, 3), out_data.float().permute(1, 0, 2, 3)
+        return (
+            inp_data.float().permute(1, 0, 2, 3), 
+            out_data.float().permute(1, 0, 2, 3)
+        )

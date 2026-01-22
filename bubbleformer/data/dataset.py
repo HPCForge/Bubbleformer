@@ -139,7 +139,8 @@ class BubbleForecast(Dataset):
                 ).squeeze(1)
                 
             inp_data.append(
-                (data_item - self.diff_terms[field]) / self.div_terms[field]
+                data_item
+                #(data_item - self.diff_terms[field]) / self.div_terms[field]
             )
         for field in self.output_fields:
             data_item = torch.tensor(self.data[file_idx][field][out_slice])
@@ -152,7 +153,8 @@ class BubbleForecast(Dataset):
                     mode="nearest"
                 ).squeeze(1)
             out_data.append(
-                (data_item - self.diff_terms[field]) / self.div_terms[field]
+                data_item
+                #(data_item - self.diff_terms[field]) / self.div_terms[field]
             )
 
         inp_data = torch.stack(inp_data)                                   # (in_C, T, H, W)
@@ -169,8 +171,12 @@ class BubbleForecast(Dataset):
                     fluid_params["thcogas"],
                     fluid_params["stefan"],
                     fluid_params["prandtl"],
-                    fluid_params["heater"]["nucWaitTime"],
                     fluid_params["heater"]["wallTemp"],
+                    fluid_params["heater"]["nucWaitTime"],
+                    fluid_params["heater"]["advAngle"],
+                    fluid_params["heater"]["velContact"],
+                    fluid_params["heater"]["xMin"],
+                    fluid_params["heater"]["xMax"],
                 ],
                 dtype=torch.float32,
             )
