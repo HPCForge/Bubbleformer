@@ -6,6 +6,7 @@ from einops import rearrange
 import math
 from rotary_embedding_torch import RotaryEmbedding
 
+@torch.compile(fullgraph=True)
 class TemporalAttention(nn.Module):
     def __init__(
         self,

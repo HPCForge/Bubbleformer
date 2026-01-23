@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+@torch.compile(fullgraph=True)
 class GeluMLP(nn.Module):
     """
     Multi-layer perceptron with a hidden layer and GELU activation
@@ -23,27 +24,7 @@ class GeluMLP(nn.Module):
         """
         return self.fc2(self.act(self.fc1(x)))
 
-class SirenMLP(nn.Module):
-    """
-    MLP with sine activation as implemented in SIREN paper
-    Args:
-        hidden_dim (int): Dimension of the hidden layer
-        w0 (float): Frequency parameter
-    """
-    def __init__(self, hidden_dim, w0=1.0):
-        super().__init__()
-        self.fc = nn.Linear(hidden_dim, hidden_dim)
-        self.w0 = w0
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x (torch.Tensor): Input tensor
-        Returns:
-            torch.Tensor: Output tensor
-        """
-        return torch.sin(self.w0 * self.fc(x))
-
+@torch.compile(fullgraph=True)
 class FiLMMLP(nn.Module):
     """
     MLP with FiLM (Feature-wise Linear Modulation) layers

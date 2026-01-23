@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 
+@torch.compile(fullgraph=True)
 class HMLPEmbed(nn.Module):
     """
     Image to Patch Embedding using hierarchical Conv2d.
@@ -57,6 +58,7 @@ class HMLPEmbed(nn.Module):
         x = self.in_proj(x)
         return x
 
+@torch.compile(fullgraph=True)
 class HMLPDebed(nn.Module):
     """
     Patch to Image De-bedding using hierarchical ConvTranspose2d.

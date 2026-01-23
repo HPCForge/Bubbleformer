@@ -40,8 +40,7 @@ def get_token_indices(
     topk_expert_indices: torch.Tensor, 
     num_experts: int
 ):
-    # The routing choices are not used in the backward pass, so this
-    # can always use no_grad.
+    # The routing choices are not used in the backward pass, so this can always use no_grad.
     with torch.no_grad():
         flat_expert_indices = topk_expert_indices.view(-1)
         # The argsort returns int64 indices, but we don't need more than 32 bits for the indices.
@@ -52,6 +51,7 @@ def get_token_indices(
         torch.cumsum(tokens_per_expert, dim=0, out=group_indices)
         return group_indices, indices, tokens_per_expert
 
+@torch.compile(fullgraph=True)
 class TopkMoE(nn.Module):
     def __init__(
         self,
@@ -68,8 +68,8 @@ class TopkMoE(nn.Module):
         self.topk = topk
         self.load_balance_loss_weight = load_balance_loss_weight
         
-        self.w1 = nn.Parameter(torch.empty(num_experts, hidden_dim, intermediate_dim))
-        self.w2 = nn.Parameter(torch.empty(num_experts, intermediate_dim, hidden_dim))
+        self.w1 = nn.Parameter(torch.empty(num_experts, hidden_dim, intermediate_dim, dtype=torch.bfloat16))
+        self.w2 = nn.Parameter(torch.empty(num_experts, intermediate_dim, hidden_dim, dtype=torch.bfloat16))
         self.router = nn.Linear(hidden_dim, num_experts)
         self.reset_parameters()
         
@@ -97,13 +97,14 @@ class TopkMoE(nn.Module):
         topk_probs, topk_indices = torch.topk(router_probs, k=self.topk, dim=-1)
         group_indices, indices, tokens_per_expert = get_token_indices(topk_indices, self.num_experts)
         
-        # Map tokens into groups based on their assigned experts
-        groups = x[indices // self.topk]
-        
+        # NOTE with torch.compile(fullgraph=True), the grouped gemm kernel does not support torch.float32, 
+        # so the input data has to be truncated to bfloat 16.
+        groups = x[indices // self.topk].to(torch.bfloat16)        
         # Compute all of the experts
         groups = torch._grouped_mm(groups, self.w1, group_indices)
         groups = F.gelu(groups)
         groups = torch._grouped_mm(groups, self.w2, group_indices)
+        groups = groups.to(torch.float32)
         
         # Scatter the tokens to [B, topk, hidden_dim]
         scattered = torch.empty_like(groups)
