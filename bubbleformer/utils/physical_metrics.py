@@ -89,8 +89,8 @@ def vorticity(velx, vely, dx, dy):
     assert velx.dim() == 4 and vely.dim() == 4, "Velocity fields must be of shape (B, T, H, W)"
     assert velx.shape == vely.shape, "Velocity fields must have the same shape"
     assert dx > 0 and dy > 0, "Spatial resolution must be positive"
-    dydx = torch.gradient(vely, spacing=dx, dim=-1)
-    dxdy = torch.gradient(velx, spacing=dy, dim=-2)
+    dydx = torch.gradient(vely, spacing=dx, dim=-1)[0]
+    dxdy = torch.gradient(velx, spacing=dy, dim=-2)[0]
     return dydx - dxdy
 
 def interface_mask(sdf):
