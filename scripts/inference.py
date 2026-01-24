@@ -10,6 +10,8 @@ import cv2
 import numpy as np
 from typing import List
 from bubbleformer.utils.moe_metrics import topk_indices_to_patch_expert_counts
+from bubbleformer.utils.sdf_reinit import fast_marching_2d
+from bubbleformer.utils.physical_metrics import eikonal
 
 def plot_bubbleml(
         preds: torch.Tensor,
@@ -59,6 +61,8 @@ def plot_bubbleml(
 
     temp_mean, temp_std = torch.mean(targets[:, 1]).item(), torch.std(targets[:, 1]).item()
     temp_min, temp_max = targets[:, 1].min().item(), targets[:, 1].max().item() #-28, 30 
+    print(preds[..., 1, :, :].min(), preds[..., 1, :, :].max())
+    print(targets[..., 1, :, :].min(), targets[..., 1, :, :].max())
     #temp_min, temp_max = 50.0, 100.0
 
     sdf_mean, sdf_std = torch.mean(targets[:, 0]).item(), torch.std(targets[:, 0]).item()
@@ -158,7 +162,7 @@ def plot_bubbleml(
 
         im_11 = axarr[1][1].imshow(temp_pred, vmin=temp_min, vmax=temp_max, origin="lower")
         # NOTE: Overlay MoE expert counts on top of the temperature prediction
-        axarr[1][1].imshow(patch_expert0_count_at_i, alpha=0.3, origin="lower")
+        #axarr[1][1].imshow(patch_expert0_count_at_i, alpha=0.3, origin="lower")
 
         #im_11 = axarr[1][1].imshow(temp_pred, cmap="turbo", origin="lower")
         #axarr[1][1].imshow(pred_overlay, alpha=1, origin="lower")
@@ -192,8 +196,6 @@ test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-LN2-
 #test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-R515B-2D/Twall_18.hdf5"]
 #test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-LN2-2D/Twall_-176.hdf5"]
 
-
-
 test_dataset = BubbleForecast(
     filenames=test_path,
     input_fields=["dfun", "temperature", "velx", "vely"],
@@ -218,7 +220,7 @@ model_kwargs = {
     "num_experts": 6,
     "topk": 2,
     "load_balance_loss_weight": 0.01,
-    "num_fluid_params": 9,
+    "num_fluid_params": 13,
 }
 
 model = get_model(model_name, **model_kwargs)
@@ -227,7 +229,8 @@ model = model.cuda()
 #weights_path = "/pub/afeeney/bubbleformer_logs/filmavit_poolboiling_subcooled_47238340/checkpoints/epoch=29-step=56760.ckpt"
 #weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47407258/checkpoints/epoch=34-step=132440.ckpt"
 #weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47512802/checkpoints/last.ckpt"
-weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47609426/checkpoints/last.ckpt"
+#weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47738409/checkpoints/epoch=4-step=59125.ckpt"
+weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47763865/checkpoints/last.ckpt"
 model_data = torch.load(weights_path, weights_only=False)
 
 diff_term = {
@@ -249,6 +252,8 @@ weight_state_dict = OrderedDict()
 for key, val in model_data["state_dict"].items():
     name = key[6:]
     weight_state_dict[name] = val
+    if torch.isnan(val).any():
+        print(f"NAN found in {name}")
 del model_data
 
 print(model)
@@ -280,6 +285,22 @@ for itr in range(0, 100, skip_itrs):
     pred = pred.to(torch.float32)
     pred = pred.squeeze(0).detach().cpu()
     tgt = tgt.detach().cpu()
+    
+    # reinitialize the top part of the SDF for each timestep
+    # heater is at index zero, 
+    for i in range(pred.shape[0]):
+        pred_sdf = pred[i, 0]
+        # The fast marching uses finite differences, so needs a finer grid. Fortunately, the SDF
+        # is very smooth, so bicubic interpolation is good enough.
+        up_pred_sdf = torch.nn.functional.interpolate(
+            pred_sdf.unsqueeze(0).unsqueeze(0), scale_factor=8, mode="bicubic").squeeze()
+        up_pred_sdf_corrected = torch.from_numpy(fast_marching_2d(up_pred_sdf.numpy(), dx=(1/4) / 8))
+        pred_sdf_corrected = torch.nn.functional.interpolate(
+            up_pred_sdf_corrected.unsqueeze(0).unsqueeze(0), scale_factor=1/8, mode="bicubic").squeeze()
+        # Only reinitialize the SDF when sufficiently far from the interfaces
+        # The constant -4.0 is chosen arbitrarily.
+        far_mask = pred_sdf < -4.0
+        pred[i, 0, far_mask] = pred_sdf_corrected[far_mask]
 
     model_preds.append(pred)
     model_targets.append(tgt)
@@ -293,12 +314,12 @@ num_var = len(test_dataset.fields)                  # C
 topk_indices = [moe_output.topk_indices.squeeze(0) for moe_output in moe_outputs]
 topk_indices = torch.cat(topk_indices, dim=0) # (T, H, W, topk)
 
+save_dir = "./subcooled_fc72_97"
+print(f"saving to {save_dir}")
 
+print(torch.stack([torch.isnan(p).any() for p in model.parameters()]).any())
 
-#save_dir = "./subcooled_fc72_97"
-#print(f"saving to {save_dir}")
-
-#os.makedirs(save_dir, exist_ok=True)
-#save_path = os.path.join(save_dir, "predictions.pt")
-#torch.save({"preds": model_preds, "targets": model_targets, "timesteps": timesteps}, save_path)
-#plot_bubbleml(model_preds, model_targets, topk_indices, timesteps, save_dir)
+os.makedirs(save_dir, exist_ok=True)
+save_path = os.path.join(save_dir, "predictions.pt")
+torch.save({"preds": model_preds, "targets": model_targets, "timesteps": timesteps}, save_path)
+plot_bubbleml(model_preds, model_targets, topk_indices, timesteps, save_dir)
