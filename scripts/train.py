@@ -15,6 +15,7 @@ from lightning.pytorch.callbacks import ModelSummary, Callback, ModelCheckpoint,
 from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
+from bubbleformer.data.batching import collate
 from bubbleformer.data import BubbleForecast, DownsampledBubbleForecast
 from bubbleformer.moe_modules import MoEForecastModule, MoEConditionedForecastModule
 
@@ -126,6 +127,7 @@ def main(cfg: DictConfig) -> None:
         num_workers=4,
         pin_memory=True,
         prefetch_factor=1,
+        collate_fn=collate,
     )
     val_dataloader = DataLoader(
         val_dataset,
@@ -134,26 +136,18 @@ def main(cfg: DictConfig) -> None:
         num_workers=4,
         pin_memory=True,
         prefetch_factor=1,
+        collate_fn=collate,
     )
-    if cfg.data_cfg.return_fluid_params:
-        train_module = MoEConditionedForecastModule(
-                model_cfg=cfg.model_cfg,
-                data_cfg=cfg.data_cfg,
-                optim_cfg=cfg.optim_cfg,
-                scheduler_cfg=cfg.scheduler_cfg,
-                log_wandb=cfg.use_wandb,
-                normalization_constants=(diff_term, div_term),
-            )
-    else:
-        train_module = MoEForecastModule(
-                model_cfg=cfg.model_cfg,
-                data_cfg=cfg.data_cfg,
-                optim_cfg=cfg.optim_cfg,
-                scheduler_cfg=cfg.scheduler_cfg,
-                log_wandb=cfg.use_wandb,
-                normalization_constants=(diff_term, div_term),
-            )
-        
+    
+    train_module = MoEConditionedForecastModule(
+        model_cfg=cfg.model_cfg,
+        data_cfg=cfg.data_cfg,
+        optim_cfg=cfg.optim_cfg,
+        scheduler_cfg=cfg.scheduler_cfg,
+        log_wandb=cfg.use_wandb,
+        normalization_constants=(diff_term, div_term),
+    )
+
     progress_bar = RichProgressBar(
         theme=RichProgressBarTheme(
             description="green_yellow",
@@ -196,7 +190,6 @@ def main(cfg: DictConfig) -> None:
             ),
             progress_bar
         ],
-        #precision="bf16-mixed",
     )
     
     if is_leader_process():

@@ -51,10 +51,13 @@ def run_test(model, test_file_path: str, max_timesteps: int):
     moe_outputs = []
 
     for itr in range(0, max_timesteps, skip_itrs):        
-        inp, tgt, fluid_params = test_dataset[itr]  
+        data = test_dataset[itr]  
+        inp = data.input
+        tgt = data.target
+        fluid_params = data.fluid_params_tensor
         if len(preds) > 0:
             inp = preds[-1]
-            
+
         inp = inp.cuda().to(torch.float32).unsqueeze(0)
         fluid_params = fluid_params.cuda().to(torch.float32).unsqueeze(0)
         
@@ -75,17 +78,7 @@ def run_test(model, test_file_path: str, max_timesteps: int):
 
     topk_indices = [moe_output.topk_indices.squeeze(0) for moe_output in moe_outputs]
     topk_indices = torch.cat(topk_indices, dim=0) # (T, H, W, topk)
-    
-    #norm = TwoSlopeNorm(vcenter=0)
-    #plt.imshow(sdf_target[0, 0, :, :], cmap="icefire", norm=norm, origin="lower")
-    #plt.savefig("sdf.png")
-    #plt.close()
-    
-    #bubbles = find_bubbles(sdf_target)[0, 50]
-    #plt.imshow(bubbles, cmap=plt.cm.nipy_spectral, origin="lower")
-    #plt.savefig("bubbles.png")
-    #plt.close()
-    
+
     print("-"*100)
     print(f"Rollout Statistics on {test_file_path}:")
     dx = 1/32 * downsample_factor
@@ -113,7 +106,7 @@ def main(cfg: DictConfig):
     
     torch.set_float32_matmul_precision("high")
     
-    model_name = "neighbor_moe"
+    model_name = cfg.model_cfg.name
     model_kwargs = {
         "input_fields": 4,
         "output_fields": 4,
@@ -145,6 +138,8 @@ def main(cfg: DictConfig):
 
     print(model)
     
+    save_dir = os.path.join(os.getcwd(), "inferences")
+    os.makedirs(save_dir, exist_ok=True)
     for test_file_path in cfg.data_cfg.test_paths:
         test_results: TestResults = run_test(model, test_file_path, max_timesteps=100)
 

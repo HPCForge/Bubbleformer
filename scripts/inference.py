@@ -204,7 +204,7 @@ test_dataset = BubbleForecast(
     downsample_factor=8,
     time_window=5,
     start_time=100,
-    return_fluid_params=True,
+    return_fluid_params=True
 )
 
 # TODO: This should all be written/read to/from a config file with the checkpoints
@@ -261,7 +261,6 @@ print(model)
 model.load_state_dict(weight_state_dict)
 model.eval()
 
-_, _ = test_dataset.normalize(diff_term, div_term)
 criterion = LpLoss(d=2, p=2, reduce_dims=[0,1], reductions=["mean", "mean"])
 start_time = test_dataset.start_time
 skip_itrs = test_dataset.time_window
@@ -272,7 +271,10 @@ timesteps = []
 moe_outputs = []
 
 for itr in range(0, 100, skip_itrs):
-    inp, tgt, fluid_params = test_dataset[itr]
+    data = test_dataset[itr]
+    inp = data.input
+    tgt = data.target
+    fluid_params = data.fluid_params_tensor
     print(f"Autoreg pred {itr}, inp tw [{start_time+itr}, {start_time+itr+skip_itrs}], tgt tw [{start_time+itr+skip_itrs}, {start_time+itr+2*skip_itrs}]")
     if len(model_preds) > 0:
         inp = model_preds[-1] # T, C, H, W

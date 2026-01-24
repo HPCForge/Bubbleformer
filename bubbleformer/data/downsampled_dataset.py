@@ -6,17 +6,8 @@ import h5py as h5
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
-
-@dataclasses.dataclass
-class Data:
-    input: torch.Tensor
-    target: torch.Tensor
-    fluid_params_tensor: torch.Tensor
-    fluid_params_dict: Dict[str, float]
-    x_grid: torch.Tensor
-    y_grid: torch.Tensor
-    dx: torch.Tensor
-    dy: torch.Tensor
+from bubbleformer.data.batching import Data
+from bubbleformer.data.batching import make_data
 
 class DownsampledBubbleForecast(Dataset):
     """
@@ -93,53 +84,7 @@ class DownsampledBubbleForecast(Dataset):
             total_len += num_traj * (traj_len - self.start_time - 2 * self.time_window + 1)
         return total_len
 
-    def normalize(
-            self,
-            diff_terms: Optional[Dict] = None,
-            div_terms: Optional[Dict] = None,
-        ) -> Tuple[torch.tensor, torch.tensor]:
-        """
-        Calculate channel-wise normalization constants and store in a Dictionary
-        Open each File object in self.data['files'] and calculate the channelwise
-        mean and std of the data
-        """
-        if diff_terms is None and div_terms is None:
-            diff_terms = {k:[] for k in self.fields}
-            div_terms = {k:[] for k in self.fields}
-            for field in self.fields:
-                                
-                for _, h5_file in enumerate(self.data):
-                    if self.norm == "std":
-                        field_data = h5_file[field][...]
-                        diff_terms[field].append(field_data.mean())
-                        div_terms[field].append(field_data.std())
-                    elif self.norm == "minmax":
-                        field_data = h5_file[field][...]
-                        diff_terms[field].append(field_data.min())
-                        div_terms[field].append(field_data.max() - field_data.min())
-                    elif self.norm == "tanh":
-                        field_data = h5_file[field][...]
-                        diff_terms[field].append(
-                            (field_data.max() + field_data.min()) / 2.0
-                        )
-                        div_terms[field].append(
-                            (field_data.max() - field_data.min()) / 2.0
-                        )
-                    elif self.norm == "none":
-                        diff_terms[field].append(0.0)
-                        div_terms[field].append(1.0)
-                    else:
-                        raise ValueError(f"Unknown normalization type: {self.norm}")
-
-                diff_terms[field] = np.mean(diff_terms[field]).item()
-                div_terms[field] = np.mean(div_terms[field]).item() + 1e-8
-
-        self.diff_terms = diff_terms
-        self.div_terms = div_terms
-
-        return self.diff_terms, self.div_terms
-
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Data:
         samples_per_traj = [
             x * (y - self.start_time - 2 * self.time_window + 1)
             for x, y in zip(self.num_trajs, self.traj_lens)
@@ -157,47 +102,37 @@ class DownsampledBubbleForecast(Dataset):
 
         for field in self.input_fields:
             data_item = torch.tensor(self.data[file_idx][field][inp_slice])                
-            inp_data.append(
-                data_item
-                #(data_item - self.diff_terms[field]) / self.div_terms[field]
-            )
+            inp_data.append(data_item)
         for field in self.output_fields:
             data_item = torch.tensor(self.data[file_idx][field][out_slice])
-            out_data.append(
-                data_item
-                #(data_item - self.diff_terms[field]) / self.div_terms[field]
-            )
+            out_data.append(data_item)
 
         inp_data = torch.stack(inp_data) # (in_C, T, H, W)
         out_data = torch.stack(out_data) # (out_C, T, H, W)
 
-        if self.return_fluid_params:
-            fluid_params = self.fluid_params[file_idx]
-            fluid_params_tensor = torch.tensor(
-                [
-                    fluid_params["inv_reynolds"],
-                    fluid_params["cpgas"],
-                    fluid_params["mugas"],
-                    fluid_params["rhogas"],
-                    fluid_params["thcogas"],
-                    fluid_params["stefan"],
-                    fluid_params["prandtl"],
-                    fluid_params["heater"]["wallTemp"],
-                    fluid_params["heater"]["nucWaitTime"],
-                    fluid_params["heater"]["advAngle"],
-                    fluid_params["heater"]["velContact"],
-                    fluid_params["heater"]["xMin"],
-                    fluid_params["heater"]["xMax"],
-                ],
-                dtype=torch.float32,
-            )
-            return (
-                inp_data.float().permute(1, 0, 2, 3),
-                out_data.float().permute(1, 0, 2, 3),
-                fluid_params_tensor
-            )
-
-        return (
-            inp_data.float().permute(1, 0, 2, 3), 
-            out_data.float().permute(1, 0, 2, 3)
+        fluid_params = self.fluid_params[file_idx]
+        fluid_params_tensor = torch.tensor(
+            [
+                fluid_params["inv_reynolds"],
+                fluid_params["cpgas"],
+                fluid_params["mugas"],
+                fluid_params["rhogas"],
+                fluid_params["thcogas"],
+                fluid_params["stefan"],
+                fluid_params["prandtl"],
+                fluid_params["heater"]["wallTemp"],
+                fluid_params["heater"]["nucWaitTime"],
+                fluid_params["heater"]["advAngle"],
+                fluid_params["heater"]["velContact"],
+                fluid_params["heater"]["xMin"],
+                fluid_params["heater"]["xMax"],
+            ],
+            dtype=torch.float32,
+        )
+        return make_data(
+            input=inp_data.float().permute(1, 0, 2, 3),
+            target=out_data.float().permute(1, 0, 2, 3),
+            fluid_params_tensor=fluid_params_tensor,
+            fluid_params_dict=fluid_params,
+            downsample_factor=self.downsample_factor
         )
