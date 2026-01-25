@@ -11,6 +11,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import matplotlib.pyplot as plt
 import lightning as L
 
+from bubbleformer.data.batching import CollatedBatch
 from bubbleformer.models import get_model
 from bubbleformer.utils.losses import LpLoss, L1Loss
 from bubbleformer.utils.lr_schedulers import CosineWarmupLR
@@ -347,20 +348,21 @@ class MoEConditionedForecastModule(ConditionedForecastModule):
 
     def training_step(
         self,
-        batch: Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor],
+        batch: CollatedBatch,
         batch_idx: int
     ) -> torch.Tensor:
-        inp, tgt, cond = batch
+        inp, tgt, cond = batch.input, batch.target, batch.fluid_params_tensor
 
         # The input is [B, T, C, H, W]
         # Randomly flip along the horizontal axis of the input and target.
         if random.random() < 0.5:
-            inp = torch.flip(inp, dims=[-1])
-            tgt = torch.flip(tgt, dims=[-1])
+            inp = torch.fliplr(inp)
+            tgt = torch.fliplr(tgt)
 
         # Add gaussian noise to the input
         if random.random() < 0.4:
-            scale = random.choice([0.01, 0.05, 0.1, 0.5, 1])
+            # Since the data is unnormalized, we can use fairly large noise scales.
+            scale = random.choice([0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5])
             inp = inp + torch.normal(0, scale, inp.shape, device=inp.device)
 
         pred, moe_outputs = self.model(inp, cond)
