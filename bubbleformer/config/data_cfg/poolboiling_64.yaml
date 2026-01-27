@@ -1,0 +1,144 @@
+dataset: poolboiling_subcooled
+input_fields: ["dfun", "temperature", "velx", "vely"]
+output_fields: ["dfun", "temperature", "velx", "vely"]
+normalize: none
+downsample_factor: 1
+max_input_window: 20
+time_window: 5
+start_time: 100
+return_fluid_params: True
+train_paths:
+  # Saturated FC72-2D
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_76.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_78.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_80.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_82.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_84.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_86.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_88.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_90.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_92.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_94.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_96.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_98.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_100.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_102.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_106.hdf5
+  # Saturated R515B-2D
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_5.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_7.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_9.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_11.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_13.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_15.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_17.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_19.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_21.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_23.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_25.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_29.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_31.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_35.hdf5
+  # Saturated LN2-2D
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-159.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-160.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-162.hdf5
+  # 164 has NaN values
+  #- /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-164.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-165.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-166.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-168.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-170.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-172.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-174.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-175.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-178.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-180.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-182.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-184.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-186.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-188.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-191.hdf5
+  # Subcooled FC72-2D
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_86.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_88.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_90.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_92.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_94.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_96.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_98.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_100.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_104.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_106.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_108.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_110.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_112.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_116.hdf5
+  # Subcooled R515B-2D
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_15.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_17.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_19.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_21.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_23.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_25.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_27.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_29.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_31.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_33.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_35.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_37.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_39.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_41.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_45.hdf5
+  # Subcooled LN2-2D
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-149.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-150.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-152.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-154.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-155.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-156.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-158.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-160.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-162.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-164.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-166.hdf5
+  # 168 has NaN values
+  #- /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-168.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-170.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-172.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-174.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-176.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-178.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-181.hdf5
+  # Different gravity conditions
+  #- /share/crsp/lab/ai4ts/share/BubbleML_f32/PoolBoiling-Gravity-FC72-2D-0.1/gravY-0.0001.hdf5
+  #- /share/crsp/lab/ai4ts/share/BubbleML_f32/PoolBoiling-Gravity-FC72-2D-0.1/gravY-0.001.hdf5
+  #- /share/crsp/lab/ai4ts/share/BubbleML_f32/PoolBoiling-Gravity-FC72-2D-0.1/gravY-0.01.hdf5
+  #- /share/crsp/lab/ai4ts/share/BubbleML_f32/PoolBoiling-Gravity-FC72-2D-0.1/gravY-0.02.hdf5
+  #- /share/crsp/lab/ai4ts/share/BubbleML_f32/PoolBoiling-Gravity-FC72-2D-0.1/gravY-0.05.hdf5
+  #- /share/crsp/lab/ai4ts/share/BubbleML_f32/PoolBoiling-Gravity-FC72-2D-0.1/gravY-0.2.hdf5
+  #- /share/crsp/lab/ai4ts/share/BubbleML_f32/PoolBoiling-Gravity-FC72-2D-0.1/gravY-0.5.hdf5
+  #- /share/crsp/lab/ai4ts/share/BubbleML_f32/PoolBoiling-Gravity-FC72-2D-0.1/gravY-1.0.hdf5
+
+val_paths:
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_102.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_27.hdf5
+
+test_paths:
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_91.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-FC72-2D/Twall_104.hdf5
+
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_18.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-R515B-2D/Twall_33.hdf5
+
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-176.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Saturated-LN2-2D/Twall_-190.hdf5
+
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_97.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-FC72-2D/Twall_114.hdf5
+
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_30.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-R515B-2D/Twall_43.hdf5
+
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-165.hdf5
+  - /share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-180.hdf5

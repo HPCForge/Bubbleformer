@@ -8,4 +8,4 @@ from .attention import (
     TemporalAttention,
 )
 from .transformer_block import TransformerBlock, TransformerMoEBlock
-from .cnn_block import CNNBlock, CNNMoEBlock
+#from .cnn_block import CNNBlock, CNNMoEBlock

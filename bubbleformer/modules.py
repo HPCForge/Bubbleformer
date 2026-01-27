@@ -382,15 +382,15 @@ class MoEConditionedForecastModule(ConditionedForecastModule):
 
     def validation_step(
         self,
-        batch: Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor],
+        batch: CollatedBatch,
         batch_idx: int
     ) -> torch.Tensor:
-        inp, tgt, cond = batch
+        inp, tgt, cond = batch.input, batch.target, batch.fluid_params_tensor
         pred, _ = self.model(inp, cond)
         loss = self.criterion(pred, tgt)
         if batch_idx == 0:
             self.validation_sample = (inp.detach(), tgt.detach(), pred.detach())
 
         self.default_log_dict({"val_loss": loss})
-    
+
         return loss
