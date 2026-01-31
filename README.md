@@ -1,10 +1,23 @@
 # Bubbleformer
 
+**Accepted to NeurIPS 2025 as a Spotlight Paper🏅**
 
-A transformer model for long range forecasting of boiling phenomena(an inherently chaotic, multiphase process central to energy and thermal systems) that generalizes across different liquids such as dielectrics and refrigerants.
+[[Paper]](https://neurips.cc/virtual/2025/loc/san-diego/poster/121854) [[Poster]](media/Poster_NIPS25_Bubbleformer_FINAL.pdf) [[Dataset on Hugging Face (BubbleML 2.0)]](https://huggingface.co/datasets/hpcforge/BubbleML_2)
+
+A transformer model for long range forecasting of boiling phenomena (an inherently chaotic, multiphase process central to energy and thermal systems) that generalizes across different liquids such as dielectrics and refrigerants.
 
 ![Bubbleformer Overview](media/paper_overview.png)
 *Figure 1: Overview of BubbleML 2.0 dataset and Bubbleformer downstream tasks*
+
+![Task Overview](media/task_overview.png)
+*Figure 2: Task overview showing the prediction and forecasting problem setup*
+
+## Prior Work
+
+This work builds upon **BubbleML**, which was accepted as a **NeurIPS 2023 Datasets and Benchmarks Spotlight**. BubbleML introduced the first large-scale multiphase boiling dataset for machine learning research.
+
+- **BubbleML Paper**: [NeurIPS 2023 Proceedings](https://proceedings.neurips.cc/paper_files/paper/2023/hash/01726ae05d72ddba3ac784a5944fa1ef-Abstract-Datasets_and_Benchmarks.html)
+- **BubbleML 1.0 & 2.0 Dataset**: [Hugging Face](https://huggingface.co/datasets/hpcforge/BubbleML_2)
 
 ## Overview
 
