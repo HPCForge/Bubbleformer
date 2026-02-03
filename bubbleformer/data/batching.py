@@ -1,6 +1,12 @@
 import dataclasses
 import torch
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
+
+@dataclasses.dataclass
+class VariableBatch:
+    input: torch.Tensor
+    target: torch.Tensor
+    fluid_params_tensor: Optional[torch.Tensor] = None
 
 @dataclasses.dataclass
 class Data:
@@ -55,6 +61,6 @@ def collate(data: List[Data]):
         fluid_params_dict=[d.fluid_params_dict for d in data],
         x_grid=torch.stack([d.x_grid for d in data]),
         y_grid=torch.stack([d.y_grid for d in data]),
-        dx=torch.stack([d.dx for d in data]),
-        dy=torch.stack([d.dy for d in data])
+        dx=torch.tensor([d.dx for d in data], dtype=torch.float32),
+        dy=torch.tensor([d.dy for d in data], dtype=torch.float32)
     )

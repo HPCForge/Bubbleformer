@@ -3,8 +3,8 @@ input_fields: ["dfun", "temperature", "velx", "vely"]
 output_fields: ["dfun", "temperature", "velx", "vely"]
 normalize: none
 downsample_factor: 1
-max_input_window: 20
-time_window: 5
+max_input_window: 75
+time_window: 10
 start_time: 100
 return_fluid_params: True
 train_paths:

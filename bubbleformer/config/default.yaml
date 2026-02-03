@@ -1,24 +1,28 @@
-log_dir: /pub/afeeney/bubbleformer_logs
+log_dir: /pub/srachaba/bubbleformer_logs
 seed: 42
 
 nodes: 1
 devices: 1
 
-max_epochs: 40
-batch_size: 16
+max_epochs: 30
+batch_size: 4
 
 checkpoint_path:
 
-use_wandb: False
+use_wandb: True
 wandb_tags:
   - time-window-5
   - relative-l2-loss
-  - Neighbor-MoE-Small
+  - Neighbor-MoE-SSM-Block
   - poolboiling
   - AdamW-optimizer
+  - Stateful-Chunk
+  - No-Noise
+  - Num-Chunks-4
+    #- Context-Window-Max-5
 defaults:
   - _self_
-  - data_cfg: poolboiling
-  - model_cfg: neighbor_moe_small
+  - data_cfg: poolboiling_64
+  - model_cfg: neighbor_moe_ssm
   - optim_cfg: adamw
   - scheduler_cfg: cosine_warmup

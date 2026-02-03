@@ -16,8 +16,10 @@ from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTh
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
 from bubbleformer.data.batching import collate
+from bubbleformer.data.dataset import collate_random_variable
 from bubbleformer.data import BubbleForecast, DownsampledBubbleForecast
-from bubbleformer.moe_modules import MoEForecastModule, MoEConditionedForecastModule
+from bubbleformer.data.downsampled_dataset import VariableInputDownsampledBubbleForecast
+from bubbleformer.modules import MoEConditionedForecastModule, LatentRolloutModule, AutoregressiveModule, StatefulAutoregressiveModule, StatefulChunkModule, StatefulBPTTModule
 
 def is_leader_process():
     """
@@ -94,7 +96,31 @@ def main(cfg: DictConfig) -> None:
         preempt_ckpt_path = params["log_dir"] + "/hpc_ckpt_" + str(preempt_ckpt_num) + ".ckpt"
 
     logger = CSVLogger(save_dir=params["log_dir"])
-
+    
+    """
+    train_dataset = VariableInputDownsampledBubbleForecast(
+                filenames=cfg.data_cfg.train_paths,
+                input_fields=cfg.data_cfg.input_fields,
+                output_fields=cfg.data_cfg.output_fields,
+                norm=cfg.data_cfg.normalize,
+                downsample_factor=cfg.data_cfg.downsample_factor,
+                max_input_window=cfg.data_cfg.max_input_window,
+                pred_window=cfg.data_cfg.time_window,
+                start_time=cfg.data_cfg.start_time,
+                return_fluid_params=cfg.data_cfg.return_fluid_params,
+            )
+    val_dataset = VariableInputDownsampledBubbleForecast(
+                filenames=cfg.data_cfg.val_paths,
+                input_fields=cfg.data_cfg.input_fields,
+                output_fields=cfg.data_cfg.output_fields,
+                norm=cfg.data_cfg.normalize,
+                downsample_factor=cfg.data_cfg.downsample_factor,
+                max_input_window=cfg.data_cfg.max_input_window,
+                pred_window=cfg.data_cfg.time_window,
+                start_time=cfg.data_cfg.start_time,
+                return_fluid_params=cfg.data_cfg.return_fluid_params,
+            )
+    """ 
     train_dataset = DownsampledBubbleForecast(
                 filenames=cfg.data_cfg.train_paths,
                 input_fields=cfg.data_cfg.input_fields,
@@ -105,7 +131,7 @@ def main(cfg: DictConfig) -> None:
                 start_time=cfg.data_cfg.start_time,
                 return_fluid_params=cfg.data_cfg.return_fluid_params,
             )
-    normalization_constants = train_dataset.normalize()
+    #normalization_constants = train_dataset.normalize()
     val_dataset = DownsampledBubbleForecast(
                 filenames=cfg.data_cfg.val_paths,
                 input_fields=cfg.data_cfg.input_fields,
@@ -116,9 +142,11 @@ def main(cfg: DictConfig) -> None:
                 start_time=cfg.data_cfg.start_time,
                 return_fluid_params=cfg.data_cfg.return_fluid_params,
             )
-    val_dataset.normalize(*normalization_constants)
-    diff_term = normalization_constants[0]
-    div_term = normalization_constants[1]
+    
+
+    #val_dataset.normalize(*normalization_constants)
+    #diff_term = normalization_constants[0]
+    #div_term = normalization_constants[1]
 
     train_dataloader = DataLoader(
         train_dataset,
@@ -127,6 +155,7 @@ def main(cfg: DictConfig) -> None:
         num_workers=4,
         pin_memory=True,
         prefetch_factor=1,
+        #collate_fn=collate_random_variable,
         collate_fn=collate,
     )
     val_dataloader = DataLoader(
@@ -136,17 +165,47 @@ def main(cfg: DictConfig) -> None:
         num_workers=4,
         pin_memory=True,
         prefetch_factor=1,
+        #collate_fn=collate_random_variable,
         collate_fn=collate,
     )
-    
+
+
+    """ 
     train_module = MoEConditionedForecastModule(
         model_cfg=cfg.model_cfg,
         data_cfg=cfg.data_cfg,
         optim_cfg=cfg.optim_cfg,
         scheduler_cfg=cfg.scheduler_cfg,
         log_wandb=cfg.use_wandb,
-        normalization_constants=(diff_term, div_term),
+        #normalization_constants=(diff_term, div_term),
     )
+    """
+    
+    
+    train_module = StatefulChunkModule(
+        model_cfg=cfg.model_cfg,
+        data_cfg=cfg.data_cfg,
+        optim_cfg=cfg.optim_cfg,
+        scheduler_cfg=cfg.scheduler_cfg,
+        log_wandb=cfg.use_wandb,
+        num_chunks=2,
+        #normalization_constants=(diff_term, div_term),
+    )
+    
+    """
+    train_module = StatefulBPTTModule(
+          model_cfg=cfg.model_cfg,
+          data_cfg=cfg.data_cfg,
+          optim_cfg=cfg.optim_cfg,
+          scheduler_cfg=cfg.scheduler_cfg,
+          log_wandb=cfg.use_wandb,
+          num_chunks=6,              # 3 chunks of 5 frames each (15 total)
+          teacher_forcing_ratio=0.6, # Start with 100% teacher forcing
+          tf_decay_steps=20000,      # Decay to autoregressive over 20k steps
+          tf_min_ratio=0.3,          # End with 20% teacher forcing (some stability)
+          tbptt_steps=6,             # Truncate gradients every 2 chunks for memory
+      )
+      """
 
     progress_bar = RichProgressBar(
         theme=RichProgressBarTheme(
@@ -170,6 +229,7 @@ def main(cfg: DictConfig) -> None:
         strategy="auto",
         max_epochs=cfg.max_epochs,
         #max_steps=30, # NOTE: limited for profiling
+        limit_train_batches=1000,
         limit_val_batches=0.2,
         logger=logger,
         default_root_dir=params["log_dir"],

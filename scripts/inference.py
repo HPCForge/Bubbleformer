@@ -3,6 +3,7 @@ import torch
 from collections import OrderedDict
 from bubbleformer.models import get_model
 from bubbleformer.data import BubbleForecast
+from bubbleformer.data.downsampled_dataset import DownsampledBubbleForecast
 from bubbleformer.utils.losses import LpLoss
 from bubbleformer.layers.moe.topk_moe import TopkMoEOutput
 import matplotlib.pyplot as plt
@@ -186,29 +187,86 @@ def plot_bubbleml(
         if i % 25 == 0:
             print(f"{i}/{preds.shape[0]} files done")
 
+
+def stateful_sliding_window_inference(
+    model,
+    initial_frames: torch.Tensor,
+    fluid_params: torch.Tensor,
+    num_predictions: int,
+    time_window: int = 5,
+):
+    """
+    Autoregressive inference with sliding window and SSM state.
+
+    The SSM state carries temporal memory across predictions, while
+    the spatial attention only sees the current window of frames.
+
+    Args:
+        model: NeighborMoESSM model (already on device)
+        initial_frames: (B, T_init, C, H, W) initial context frames
+        fluid_params: (B, num_fluid_params) conditioning
+        num_predictions: Number of frames to predict
+        time_window: Size of sliding window
+
+    Returns:
+        predictions: list of (T, C, H, W) tensors (on CPU)
+        moe_outputs: list of MoE outputs for routing analysis
+    """
+    model.eval()
+    device = next(model.parameters()).device
+
+    # Initialize sliding buffer with last time_window frames
+    buffer = initial_frames[:, -time_window:].to(device)
+    fluid_params = fluid_params.to(device)
+
+    # Initialize SSM states as None (will become zeros on first forward)
+    states = None
+
+    predictions = []
+    moe_outputs_all = []
+
+    with torch.no_grad():
+        for step in range(num_predictions):
+            # Forward pass with state - state carries forward!
+            pred, states, moe_outputs = model(buffer, fluid_params, states)
+
+            # Take last predicted frame
+            next_frame = pred[:, -1:]  # (B, 1, C, H, W)
+            predictions.append(next_frame.squeeze(0).cpu())  # (1, C, H, W)
+            moe_outputs_all.append(moe_outputs[0])  # Track first layer
+
+            # Slide buffer: drop oldest, append prediction
+            buffer = torch.cat([buffer[:, 1:], next_frame], dim=1)
+
+            if step % 25 == 0:
+                print(f"Stateful inference step {step}/{num_predictions}")
+
+    return predictions, moe_outputs_all
+
+
 torch.set_float32_matmul_precision("high")
 
 #test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-FC72-2D/Twall_97.hdf5"]
 #test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-R515B-2D/Twall_30.hdf5"]
-test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Subcooled-LN2-2D/Twall_-165.hdf5"]
+test_path = ["/share/crsp/lab/amowli/share/BubbleML_2_downsampled64/PoolBoiling-Subcooled-LN2-2D/Twall_-165.hdf5"]
 
 #test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-FC72-2D/Twall_91.hdf5"]
 #test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-R515B-2D/Twall_18.hdf5"]
 #test_path = ["/share/crsp/lab/amowli/share/BubbleML_2/PoolBoiling-Saturated-LN2-2D/Twall_-176.hdf5"]
 
-test_dataset = BubbleForecast(
+test_dataset = DownsampledBubbleForecast(
     filenames=test_path,
     input_fields=["dfun", "temperature", "velx", "vely"],
     output_fields=["dfun", "temperature", "velx", "vely"],
     norm="none",    
-    downsample_factor=8,
+    downsample_factor=1,
     time_window=5,
     start_time=100,
     return_fluid_params=True
 )
 
 # TODO: This should all be written/read to/from a config file with the checkpoints
-model_name = "neighbor_moe"
+model_name = "neighbor_moe_ssm_one"
 model_kwargs = {
     "input_fields": 4,
     "output_fields": 4,
@@ -221,6 +279,8 @@ model_kwargs = {
     "topk": 2,
     "load_balance_loss_weight": 0.01,
     "num_fluid_params": 13,
+    "d_state": 128,
+    "ssm_mode": "diag",
 }
 
 model = get_model(model_name, **model_kwargs)
@@ -230,7 +290,16 @@ model = model.cuda()
 #weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47407258/checkpoints/epoch=34-step=132440.ckpt"
 #weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47512802/checkpoints/last.ckpt"
 #weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47738409/checkpoints/epoch=4-step=59125.ckpt"
-weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47763865/checkpoints/last.ckpt"
+#weights_path = "/pub/afeeney/bubbleformer_logs/neighbor_moe_poolboiling_subcooled_47763865/checkpoints/last.ckpt"
+#weights_path = "/pub/srachaba/bubbleformer_logs/neighbor_moe_ssm_poolboiling_subcooled_47904759/checkpoints/last.ckpt"
+#weights_path = "/pub/srachaba/bubbleformer_logs/neighbor_moe_ssm_poolboiling_subcooled_47918569/checkpoints/last.ckpt"
+#weights_path = "/pub/srachaba/bubbleformer_logs/neighbor_moe_ssm_poolboiling_subcooled_47932397/checkpoints/last.ckpt"
+#weights_path = "/pub/srachaba/bubbleformer_logs/neighbor_moe_ssm_poolboiling_subcooled_47928397/checkpoints/last.ckpt"
+#weights_path = "/pub/srachaba/bubbleformer_logs/neighbor_moe_ssm_poolboiling_subcooled_47943967/checkpoints/last.ckpt"
+#weights_path = "/pub/srachaba/bubbleformer_logs/neighbor_moe_ssm_one_poolboiling_subcooled_47956632/checkpoints/last.ckpt"
+#weights_path = "/pub/srachaba/bubbleformer_logs/neighbor_moe_ssm_one_poolboiling_subcooled_47967438/checkpoints/last.ckpt"
+weights_path = "/pub/srachaba/bubbleformer_logs/neighbor_moe_ssm_one_poolboiling_subcooled_47974232/checkpoints/last.ckpt"
+
 model_data = torch.load(weights_path, weights_only=False)
 
 diff_term = {
@@ -250,6 +319,8 @@ div_term = {
 # div_term = torch.tensor(div_term)
 weight_state_dict = OrderedDict()
 for key, val in model_data["state_dict"].items():
+    if not key.startswith("model."):
+        continue  # Skip non-model keys like ema_physical, ema_latent
     name = key[6:]
     weight_state_dict[name] = val
     if torch.isnan(val).any():
@@ -270,53 +341,119 @@ timesteps = []
 
 moe_outputs = []
 
+ctx_len = 100
+context = None
+
+"""
+for itr in range(0, 100, skip_itrs):
+    # ---- Load GT input window & fluid params ----
+    sample = test_dataset[200+itr]
+    inp, tgt, fluid = sample.input, sample.target, sample.fluid_params_tensor
+    tgt_cpu = tgt.detach().cpu()                 # [K, C, H, W]  (keep on CPU)
+
+    inp   = inp.unsqueeze(0).cuda(non_blocking=True).float()    # [1, K, C, H, W]
+    fluid = fluid.unsqueeze(0).cuda(non_blocking=True).float()  # [1, num_params]
+    if len(model_preds) > 0:
+        inp = model_preds[-1].unsqueeze(0).cuda().float()
+    # ---- Build combined [B, T_total, C, H, W] on GPU ----
+    if context is not None:
+        ctx_gpu = context.to(inp.device, non_blocking=True)     # [1, ctx_len, C, H, W]
+        combined = torch.cat([ctx_gpu, inp], dim=1)# [1, ctx_len+K, C, H, W]
+        del ctx_gpu
+    else:
+        combined = inp                                          # [1, K, C, H, W]
+
+    # ---- Run model (no grad) ----
+    with torch.no_grad():
+        print(combined.shape, " combined")
+        pred, moe_output = model(combined, fluid)
+        pred = pred.squeeze(0)
+        moe_outputs.append(moe_output[0])
+
+    # ---- Store results on CPU ----
+    pred_cpu = pred.detach().cpu()                              # [K, C, H, W]
+    model_preds.append(pred_cpu)
+    model_targets.append(tgt_cpu)
+    timesteps.append(torch.arange(start_time + itr,
+                                  start_time + itr + skip_itrs))  # [K]
+    
+    tgt = tgt.cuda()
+    loss = criterion(pred, tgt)
+    print(pred.shape, tgt.shape, loss)
+    #continue
+    # ---- Update context on CPU ----
+    if context is None:
+        new_ctx = pred_cpu.unsqueeze(0)                         # [1, K, C, H, W]
+    else:
+        new_ctx = torch.cat([context, pred_cpu.unsqueeze(0)], dim=1)
+
+    if new_ctx.size(1) > ctx_len:
+        context = new_ctx[:, -ctx_len:]                         # [1, ctx_len, C, H, W]
+    else:
+        context = new_ctx
+
+    # ---- Clean up GPU tensors ----
+    del combined, pred, inp, fluid
+    torch.cuda.empty_cache()
+"""
+
+# ============================================================================
+# STATEFUL INFERENCE: Uses SSM state to maintain memory across predictions
+# ============================================================================
+# When True: Chunk-by-chunk inference with state carried forward (matches training)
+# When False: Chunk-by-chunk inference with state reset each step
+USE_STATEFUL_INFERENCE = True
+
+# Chunk-by-chunk inference (matches StatefulChunkModule training)
+# Initialize SSM states as None - will be carried forward if USE_STATEFUL_INFERENCE=True
+states = None
+
 for itr in range(0, 100, skip_itrs):
     data = test_dataset[itr]
-    inp = data.input
+    if itr == 0:
+        inp = data.input
+    else:
+        inp = model_preds[-1]
     tgt = data.target
     fluid_params = data.fluid_params_tensor
     print(f"Autoreg pred {itr}, inp tw [{start_time+itr}, {start_time+itr+skip_itrs}], tgt tw [{start_time+itr+skip_itrs}, {start_time+itr+2*skip_itrs}]")
-    if len(model_preds) > 0:
-        inp = model_preds[-1] # T, C, H, W
+
     inp = inp.cuda().to(torch.float32).unsqueeze(0)
     fluid_params = fluid_params.cuda().to(torch.float32).unsqueeze(0)
 
-    pred, moe_output = model(inp, fluid_params)
-    moe_outputs.append(moe_output[0]) # NOTE: tracking first layer of MoE outputs
+    # Pass states to model - matches StatefulChunkModule.training_step pattern:
+    #   pred, states, moe_outputs = self.model(chunks[k], cond, states)
+    # If USE_STATEFUL_INFERENCE=False, reset states each step
+    input_states = states if USE_STATEFUL_INFERENCE else None
+    pred, states, moe_output = model(inp, fluid_params, input_states)
+    moe_outputs.append(moe_output[0])  # NOTE: tracking first layer of MoE outputs
 
     pred = pred.to(torch.float32)
     pred = pred.squeeze(0).detach().cpu()
     tgt = tgt.detach().cpu()
-    
-    # reinitialize the top part of the SDF for each timestep
-    # heater is at index zero, 
-    for i in range(pred.shape[0]):
-        pred_sdf = pred[i, 0]
-        # The fast marching uses finite differences, so needs a finer grid. Fortunately, the SDF
-        # is very smooth, so bicubic interpolation is good enough.
-        up_pred_sdf = torch.nn.functional.interpolate(
-            pred_sdf.unsqueeze(0).unsqueeze(0), scale_factor=8, mode="bicubic").squeeze()
-        up_pred_sdf_corrected = torch.from_numpy(fast_marching_2d(up_pred_sdf.numpy(), dx=(1/4) / 8))
-        pred_sdf_corrected = torch.nn.functional.interpolate(
-            up_pred_sdf_corrected.unsqueeze(0).unsqueeze(0), scale_factor=1/8, mode="bicubic").squeeze()
-        # Only reinitialize the SDF when sufficiently far from the interfaces
-        # The constant -4.0 is chosen arbitrarily.
-        far_mask = pred_sdf < -4.0
-        pred[i, 0, far_mask] = pred_sdf_corrected[far_mask]
+    print(f"  Pred stats - mean: {pred.mean():.4f}, std: {pred.std():.4f}, min: {pred.min():.4f}, max: {pred.max():.4f}")
+    print(f"  Tgt stats  - mean: {tgt.mean():.4f}, std: {tgt.std():.4f}, min: {tgt.min():.4f}, max: {tgt.max():.4f}")
+
+    if USE_STATEFUL_INFERENCE and states is not None and len(states) > 0:
+        state = states[0]
+        state_abs = state.abs() if state.is_complex() else state
+        print(f"  State stats - norm: {state_abs.norm().item():.4f}, mean: {state_abs.mean().item():.4f}")
 
     model_preds.append(pred)
     model_targets.append(tgt)
     timesteps.append(torch.arange(start_time+itr+skip_itrs, start_time+itr+2*skip_itrs))
 
-model_preds = torch.cat(model_preds, dim=0)         # T, C, H, W
-model_targets = torch.cat(model_targets, dim=0)     # T, C, H, W
+# Stack predictions and targets
+model_preds = torch.cat(model_preds, dim=0)      # (T, C, H, W)
+model_targets = torch.cat(model_targets, dim=0)  # (T, C, H, W)
+
 timesteps = torch.cat(timesteps, dim=0)             # T,
 num_var = len(test_dataset.fields)                  # C
 
 topk_indices = [moe_output.topk_indices.squeeze(0) for moe_output in moe_outputs]
 topk_indices = torch.cat(topk_indices, dim=0) # (T, H, W, topk)
 
-save_dir = "./subcooled_fc72_97"
+save_dir = "/pub/srachaba/temp"
 print(f"saving to {save_dir}")
 
 print(torch.stack([torch.isnan(p).any() for p in model.parameters()]).any())

@@ -1,4 +1,4 @@
-name: neighbor_moe
+name: neighbor_moe_ssm_block
 params:
   patch_size: 4
   embed_dim: 384
@@ -8,3 +8,5 @@ params:
   num_experts: 6
   topk: 2
   load_balance_loss_weight: 0.01
+  d_state: 128
+  ssm_mode: diag  # 'diag' for S4D, 'dplr' for full S4

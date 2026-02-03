@@ -7,5 +7,5 @@ from .attention import (
     SpatialNeighborhoodAttention,
     TemporalAttention,
 )
-from .transformer_block import TransformerBlock, TransformerMoEBlock
+from .transformer_block import TransformerBlock, TransformerMoEBlock, TransformerMoEBlockSSM
 #from .cnn_block import CNNBlock, CNNMoEBlock
