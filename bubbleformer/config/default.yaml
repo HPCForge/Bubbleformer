@@ -1,6 +1,8 @@
 log_dir: /pub/sheikhh1/bubbleformer_logs
 seed: 42
 
+expt: # forecast, temp_prediction, bulk_flow
+
 nodes:
 devices:
 

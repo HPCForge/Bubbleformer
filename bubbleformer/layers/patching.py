@@ -2,6 +2,16 @@ import math
 import torch
 import torch.nn as nn
 
+ACTIVATION = {
+    "gelu":nn.GELU(),
+    "tanh":nn.Tanh(),
+    "sigmoid":nn.Sigmoid(),
+    "relu":nn.ReLU(),
+    "leaky_relu":nn.LeakyReLU(0.1),
+    "softplus":nn.Softplus(),
+    "ELU":nn.ELU(),
+    "silu":nn.SiLU()
+}
 
 class HMLPEmbed(nn.Module):
     """
@@ -113,3 +123,52 @@ class HMLPDebed(nn.Module):
             torch.Tensor: Output tensor of shape (B, C, H, W)
         """
         return self.out_proj(x)
+
+class PatchEmbed(nn.Module):
+    """
+        Vision Transformer style Patch Embedding
+        Args:
+            img_size (int): Size of the input image
+            patch_size (int): Size of the patch
+            in_channels (int): Number of input channels
+            embed_dim (int): Dimension of the embedding
+            out_dim (int): Dimension of the output
+            act (str): Activation function
+    """
+    def __init__(
+        self,
+        img_size: int = 224,
+        patch_size: int = 16,
+        in_channels: int = 3,
+        embed_dim: int = 768,
+        out_dim: int = 128,
+        act: str = 'gelu'
+    ):
+        super().__init__()
+        img_size = (img_size, img_size)
+        patch_size = (patch_size, patch_size)
+        num_patches = (img_size[1] // patch_size[1]) * (img_size[0] // patch_size[0])
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.num_patches = num_patches
+        self.out_size = (img_size[0] // patch_size[0], img_size[1] // patch_size[1])
+        self.out_dim = out_dim
+        self.act = ACTIVATION[act]
+
+        self.proj = nn.Sequential(
+            nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size),
+            self.act,
+            nn.Conv2d(embed_dim, out_dim, kernel_size=1, stride=1)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x (torch.Tensor): Input tensor of shape (B, C, H, W)
+        Returns:
+            torch.Tensor: Output tensor of shape (B, out_dim, H_patches, W_patches)
+        """
+        B, C, H, W = x.shape
+        assert H == self.img_size[0] and W == self.img_size[1]
+        x = self.proj(x)
+        return x
