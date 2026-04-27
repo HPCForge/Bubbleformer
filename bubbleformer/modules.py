@@ -13,7 +13,8 @@ import lightning as L
 from bubbleformer.models import get_model
 from bubbleformer.utils.losses import LpLoss
 from bubbleformer.utils.lr_schedulers import CosineWarmupLR
-from bubbleformer.utils.plot_utils import wandb_sdf_plotter, wandb_temp_plotter, wandb_vel_plotter
+from bubbleformer.utils.plot_utils import wandb_sdf_plotter, wandb_rho_plotter, \
+      wandb_temp_plotter, wandb_vel_plotter
 
 
 class ForecastModule(L.LightningModule):
@@ -48,7 +49,7 @@ class ForecastModule(L.LightningModule):
         self.log_wandb = log_wandb
 
         self.criterion = LpLoss(d=2, p=2, reduce_dims=[0,1,2], reductions=["mean", "mean", "sum"])
-        self.model_cfg["params"]["input_fields"] = len(self.data_cfg["input_fields"])
+        self.model_cfg["params"]["input_fields"] = self._get_model_input_fields()
         self.model_cfg["params"]["output_fields"] = len(self.data_cfg["output_fields"])
         self.model_cfg["params"]["time_window"] = self.data_cfg["time_window"]
         self.model = get_model(self.model_cfg["name"], **self.model_cfg["params"])
@@ -59,6 +60,10 @@ class ForecastModule(L.LightningModule):
         self.validation_sample = None
         self.train_start_time = None
         self.val_start_time = None
+
+    def _get_model_input_fields(self) -> int:
+        """Return the number of channels produced by the dataset for model inputs."""
+        return len(self.data_cfg["input_fields"])
 
     def setup(
         self,
@@ -104,7 +109,6 @@ class ForecastModule(L.LightningModule):
             wandb.log({"train_loss": loss, "learning_rate": current_lr})
 
         return loss
-
     def validation_step(
         self,
         batch: Tuple[torch.Tensor, torch.Tensor],
@@ -128,7 +132,6 @@ class ForecastModule(L.LightningModule):
             wandb.log({"val_loss": loss})
 
         return loss
-
     def configure_optimizers(self):
         opt_name = self.optimizer_cfg["name"]
         opt_params = self.optimizer_cfg["params"]
@@ -215,6 +218,17 @@ class ForecastModule(L.LightningModule):
             except ValueError:
                 pass
             try:
+                rho_idx = fields.index("rho")
+                target_rhos = wandb_rho_plotter(target_sample[:,rho_idx,:,:])
+                pred_rhos = wandb_rho_plotter(pred_sample[:,rho_idx,:,:])
+                wandb.log({
+                    "Target Rho": wandb.Image(target_rhos, caption=f"Epc {self.current_epoch}"),
+                    "Prediction Rho": wandb.Image(pred_rhos, caption=f"Epc {self.current_epoch}"),
+                })
+
+            except ValueError:
+                pass
+            try:
                 temp_idx = fields.index("temperature")
                 target_temps = wandb_temp_plotter(target_sample[:,temp_idx,:,:])
                 pred_temps = wandb_temp_plotter(pred_sample[:,temp_idx,:,:])
@@ -239,11 +253,9 @@ class ForecastModule(L.LightningModule):
                                     ],
                                     dim=1
                                 )
-                #input_vels = wandb_vel_plotter(input_vel_field)
                 target_vels = wandb_vel_plotter(target_vel_field)
                 pred_vels = wandb_vel_plotter(pred_vel_field)
                 wandb.log({
-                    #"Input Velocity": wandb.Image(input_vels),
                     "Target Vel": wandb.Image(target_vels, caption=f"Epc {self.current_epoch}"),
                     "Prediction Vel": wandb.Image(pred_vels, caption=f"Epc {self.current_epoch}")
                 })
@@ -258,6 +270,17 @@ class ForecastModule(L.LightningModule):
                 wandb.log({"val_loss_epoch": val_loss, "epoch": self.current_epoch})
             except:
                 pass
+
+
+class BulkFlowModule(ForecastModule):
+    """
+    Module for predicting bulk temperature and velocity fields from interface velocities.
+
+    The BulkFlow dataset returns dfun, interface_velx, and interface_vely as inputs.
+    The targets are temperature, velx, and vely.
+    """
+    def _get_model_input_fields(self) -> int:
+        return 3
 
 
 class ConditionedForecastModule(ForecastModule):

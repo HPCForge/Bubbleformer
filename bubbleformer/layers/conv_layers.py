@@ -1,6 +1,36 @@
 import torch
 import torch.nn as nn
 
+
+class ConvFeatureExtractor(nn.Module):
+    """
+    A simple pointwise convolutional feature extractor with a 1x1 convolution 
+    followed by GELU activation respecting function spaces.
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+    """
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int
+    ):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0),
+            nn.GELU(),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x (torch.Tensor): Input tensor of shape (B, in_ch, H, W)
+        Returns:
+            torch.Tensor: Output tensor of shape (B, out_ch, H, W)
+        """
+        return self.conv(x)
+
+
 class ResidualBlock(nn.Module):
     """
     Wide Residual Blocks used in modern Unet architectures.

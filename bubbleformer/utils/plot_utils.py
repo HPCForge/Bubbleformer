@@ -196,6 +196,18 @@ def wandb_sdf_plotter(sdf: torch.Tensor) -> plt.Figure:
     fig.colorbar(img, fraction=0.04, pad=0.05)
     return fig
 
+def wandb_rho_plotter(rho: torch.Tensor) -> plt.Figure:
+    """
+    Return the plot of a single T x H x W density tensor
+    """
+    fig, axes = plt.subplots(1, rho.shape[0], figsize=(3 * rho.shape[0], 6))
+    for i, ax in enumerate(axes):
+        img = ax.imshow(rho[i].cpu().numpy(), cmap="Spectral", origin="lower")
+        ax.axis("off")
+        ax.set_title(f"Rho {i}")
+    fig.colorbar(img, fraction=0.04, pad=0.05)
+    return fig
+
 def wandb_temp_plotter(temp: torch.Tensor) -> plt.Figure:
     """
     Return the plot of a single T x H x W temperature tensor

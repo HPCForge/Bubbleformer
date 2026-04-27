@@ -1,0 +1,1239 @@
+{
+  "@context": {
+    "@language": "en",
+    "@vocab": "https://schema.org/",
+    "arrayShape": "cr:arrayShape",
+    "citeAs": "cr:citeAs",
+    "column": "cr:column",
+    "conformsTo": "dct:conformsTo",
+    "cr": "http://mlcommons.org/croissant/",
+    "data": {
+      "@id": "cr:data",
+      "@type": "@json"
+    },
+    "dataBiases": "cr:dataBiases",
+    "dataCollection": "cr:dataCollection",
+    "dataType": {
+      "@id": "cr:dataType",
+      "@type": "@vocab"
+    },
+    "dct": "http://purl.org/dc/terms/",
+    "extract": "cr:extract",
+    "field": "cr:field",
+    "fileProperty": "cr:fileProperty",
+    "fileObject": "cr:fileObject",
+    "fileSet": "cr:fileSet",
+    "format": "cr:format",
+    "includes": "cr:includes",
+    "isArray": "cr:isArray",
+    "isLiveDataset": "cr:isLiveDataset",
+    "jsonPath": "cr:jsonPath",
+    "key": "cr:key",
+    "md5": "cr:md5",
+    "parentField": "cr:parentField",
+    "path": "cr:path",
+    "personalSensitiveInformation": "cr:personalSensitiveInformation",
+    "recordSet": "cr:recordSet",
+    "references": "cr:references",
+    "regex": "cr:regex",
+    "repeated": "cr:repeated",
+    "replace": "cr:replace",
+    "sc": "https://schema.org/",
+    "separator": "cr:separator",
+    "source": "cr:source",
+    "subField": "cr:subField",
+    "transform": "cr:transform"
+  },
+  "@type": "sc:Dataset",
+  "distribution": [
+    {
+      "@type": "cr:FileObject",
+      "@id": "repo",
+      "name": "repo",
+      "description": "The Hugging Face git repository.",
+      "contentUrl": "https://huggingface.co/datasets/hpcforge/BubbleML_2/tree/refs%2Fconvert%2Fparquet",
+      "encodingFormat": "git+https",
+      "sha256": "https://github.com/mlcommons/croissant/issues/80"
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "parquet-files-for-config-default",
+      "containedIn": {
+        "@id": "repo"
+      },
+      "encodingFormat": "application/x-parquet",
+      "includes": "default/*/*.parquet"
+    }
+  ],
+  "recordSet": [
+    {
+      "@type": "cr:RecordSet",
+      "dataType": "cr:Split",
+      "key": {
+        "@id": "default_splits/split_name"
+      },
+      "@id": "default_splits",
+      "name": "default_splits",
+      "description": "Splits for the default config.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "default_splits/split_name",
+          "dataType": "sc:Text"
+        }
+      ],
+      "data": [
+        {
+          "default_splits/split_name": "test"
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "default",
+      "description": "hpcforge/BubbleML_2 - 'default' subset",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "default/split",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "fileProperty": "fullpath"
+            },
+            "transform": {
+              "regex": "default/(?:partial-)?(test)/.+parquet$"
+            }
+          },
+          "references": {
+            "field": {
+              "@id": "default_splits/split_name"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/geometry",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "geometry"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/xl_boundary_type",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "xl_boundary_type"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/xr_boundary_type",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "xr_boundary_type"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/yl_boundary_type",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "yl_boundary_type"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/yr_boundary_type",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "yr_boundary_type"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/num_blocks_x",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "num_blocks_x"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/num_blocks_y",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "num_blocks_y"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/nx_block",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "nx_block"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/ny_block",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "ny_block"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/dt",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "dt"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/t_initial",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "t_initial"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/t_final",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "t_final"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/x_min",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "x_min"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/x_max",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "x_max"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/y_min",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "y_min"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/y_max",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "y_max"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/gravx",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "gravx"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/gravy",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "gravy"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/gravz",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "gravz"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/prandtl",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "prandtl"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/inv_reynolds",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "inv_reynolds"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/inflow_velscale",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "inflow_velscale"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/cpgas",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "cpgas"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/mugas",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "mugas"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/rhogas",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "rhogas"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/thcogas",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "thcogas"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/stefan",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "stefan"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/heater_1",
+          "subField": [
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/C0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "C0"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/C1",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "C1"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/C2",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "C2"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/C3",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "C3"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/advAngle",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "advAngle"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/heatFlux",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "heatFlux"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/heatFluxFlg",
+              "dataType": "cr:Int64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "heatFluxFlg"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/nucTemp",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "nucTemp"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/nucWaitTime",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "nucWaitTime"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/rcdAngle",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "rcdAngle"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/tblThickness",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "tblThickness"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/varTempFlg",
+              "dataType": "cr:Int64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "varTempFlg"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/velContact",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "velContact"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/wallTemp",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "wallTemp"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/xMax",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "xMax"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/xMin",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "xMin"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/yMax",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "yMax"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/yMin",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "yMin"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/zMax",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "zMax"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_1/zMin",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_1"
+                },
+                "transform": {
+                  "jsonPath": "zMin"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/nuc_seed_radii_1",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "nuc_seed_radii_1"
+            }
+          },
+          "isArray": true,
+          "arrayShape": "-1"
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/nuc_sites_x_1",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "nuc_sites_x_1"
+            }
+          },
+          "isArray": true,
+          "arrayShape": "-1"
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/nuc_sites_y_1",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "nuc_sites_y_1"
+            }
+          },
+          "isArray": true,
+          "arrayShape": "-1"
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/heater_2",
+          "subField": [
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/C0_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "C0"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/C1_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "C1"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/C2_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "C2"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/C3_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "C3"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/advAngle_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "advAngle"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/heatFlux_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "heatFlux"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/heatFluxFlg_0",
+              "dataType": "cr:Int64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "heatFluxFlg"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/nucTemp_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "nucTemp"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/nucWaitTime_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "nucWaitTime"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/rcdAngle_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "rcdAngle"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/tblThickness_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "tblThickness"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/varTempFlg_0",
+              "dataType": "cr:Int64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "varTempFlg"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/velContact_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "velContact"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/wallTemp_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "wallTemp"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/xMax_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "xMax"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/xMin_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "xMin"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/yMax_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "yMax"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/yMin_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "yMin"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/zMax_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "zMax"
+                }
+              }
+            },
+            {
+              "@type": "cr:Field",
+              "@id": "default/heater_2/zMin_0",
+              "dataType": "cr:Float64",
+              "source": {
+                "fileSet": {
+                  "@id": "parquet-files-for-config-default"
+                },
+                "extract": {
+                  "column": "heater_2"
+                },
+                "transform": {
+                  "jsonPath": "zMin"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/nuc_seed_radii_2",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "nuc_seed_radii_2"
+            }
+          },
+          "isArray": true,
+          "arrayShape": "-1"
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/nuc_sites_x_2",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "nuc_sites_x_2"
+            }
+          },
+          "isArray": true,
+          "arrayShape": "-1"
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "default/nuc_sites_y_2",
+          "dataType": "cr:Float64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-default"
+            },
+            "extract": {
+              "column": "nuc_sites_y_2"
+            }
+          },
+          "isArray": true,
+          "arrayShape": "-1"
+        }
+      ]
+    }
+  ],
+  "conformsTo": "http://mlcommons.org/croissant/1.1",
+  "name": "BubbleML_2",
+  "identifier": "10.57967/hf/5594",
+  "description": "\n\t\n\t\t\n\t\tBubbleML 2.0:\n\t\n\nBubbleML_2 is a high-fidelity dataset of boiling simulations in 2D for three fluids (FC-72, Liquid N2 and R515B). It provides paired time-series fields stored in HDF5 (.hdf5) files together with metadata (.json) and explicit train/test splits.\n\n\n\t\n\t\t\n\t\t🚀 Quickstart\n\t\n\nThe current available dataset subsets are-\n\"single-bubble\", \"pb-saturated\", \"pb-subcooled\", \"fb-velscale\", \"fb-chf\"\n\nThey are chosen for each individual forecasting task in our paper, viz. Single Bubble… See the full description on the dataset page: https://huggingface.co/datasets/hpcforge/BubbleML_2.",
+  "alternateName": [
+    "hpcforge/BubbleML_2"
+  ],
+  "creator": {
+    "@type": "Organization",
+    "name": "HPCForge Lab @ UC Irvine",
+    "url": "https://huggingface.co/hpcforge"
+  },
+  "keywords": [
+    "cc-by-4.0",
+    "\u003C 1K",
+    "json",
+    "Tabular",
+    "Text",
+    "Datasets",
+    "Dask",
+    "Croissant",
+    "doi:10.57967/hf/5594",
+    "🇺🇸 Region: US"
+  ],
+  "license": "https://choosealicense.com/licenses/cc-by-4.0/",
+  "url": "https://huggingface.co/datasets/hpcforge/BubbleML_2"
+}

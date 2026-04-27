@@ -5,40 +5,66 @@ normalize: none
 downsample_factor: 1
 time_window: 5
 start_time: 100
-return_fluid_params: True
+return_fluid_params: False
 train_paths:
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_76.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_78.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_80.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_82.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_84.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_86.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_88.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_90.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_92.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_94.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_96.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_98.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_100.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_102.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_104.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_106.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_5.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_7.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_9.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_11.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_13.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_15.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_17.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_19.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_21.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_23.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_25.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_27.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_29.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_31.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_33.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_35.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_75.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_76.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_78.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_80.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_82.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_84.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_86.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_88.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_90.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_92.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_94.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_96.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_98.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_100.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_102.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_104.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_106.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_107.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_4.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_5.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_7.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_9.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_11.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_13.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_15.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_17.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_19.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_21.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_23.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_25.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_27.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_29.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_31.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_33.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_35.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_36.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-159.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-160.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-162.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-164.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-166.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-168.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-170.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-172.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-174.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-176.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-178.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-180.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-182.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-184.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-186.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-188.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-190.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-191.hdf5
 val_paths:
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-FC72-2D/Twall_91.hdf5
-  - /share/crsp/lab/amowli/share/Bubbleformer/PoolBoiling-Saturated-R515B-2D/Twall_18.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_91.hdf5
+  - ${data_home}/PoolBoiling-Saturated-FC72-2D/Twall_101.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_18.hdf5
+  - ${data_home}/PoolBoiling-Saturated-R515B-2D/Twall_28.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-175.hdf5
+  # - ${data_home}/PoolBoiling-Saturated-LN2-2D/Twall_-165.hdf5

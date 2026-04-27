@@ -13,8 +13,8 @@ from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.callbacks import ModelSummary, Callback
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 
-from bubbleformer.data import BubbleForecast
-from bubbleformer.modules import ForecastModule, ConditionedForecastModule
+from bubbleformer.data import BubbleForecast, TempPredict, BulkFlow
+from bubbleformer.modules import ForecastModule, ConditionedForecastModule, BulkFlowModule
 from bubbleformer.models.axial_vit import SpaceTimeBlock
 
 def checkpoint_policy(module, **kwargs):
@@ -79,6 +79,7 @@ def main(cfg: DictConfig) -> None:
     params["model_cfg"] = cfg.model_cfg
     params["optim_cfg"] =  cfg.optim_cfg
     params["scheduler_cfg"] =  cfg.scheduler_cfg
+    params["expt"] = cfg.expt
 
     if params["checkpoint_path"] is None:
         log_id = (
@@ -97,7 +98,28 @@ def main(cfg: DictConfig) -> None:
 
     logger = CSVLogger(save_dir=params["log_dir"])
 
-    train_dataset = BubbleForecast(
+    if cfg.expt == "temp_prediction":
+        train_dataset = TempPredict(
+                filenames=cfg.data_cfg.train_paths,
+                input_fields=cfg.data_cfg.input_fields,
+                output_fields=cfg.data_cfg.output_fields,
+                norm=cfg.data_cfg.normalize,
+                downsample_factor=cfg.data_cfg.downsample_factor,
+                time_window=cfg.data_cfg.time_window,
+                start_time=cfg.data_cfg.start_time,
+            )
+    elif cfg.expt == "bulk_flow":
+        train_dataset = BulkFlow(
+                filenames=cfg.data_cfg.train_paths,
+                input_fields=cfg.data_cfg.input_fields,
+                output_fields=cfg.data_cfg.output_fields,
+                norm=cfg.data_cfg.normalize,
+                downsample_factor=cfg.data_cfg.downsample_factor,
+                time_window=cfg.data_cfg.time_window,
+                start_time=cfg.data_cfg.start_time,
+            )
+    elif cfg.expt == "forecast":
+        train_dataset = BubbleForecast(
                 filenames=cfg.data_cfg.train_paths,
                 input_fields=cfg.data_cfg.input_fields,
                 output_fields=cfg.data_cfg.output_fields,
@@ -107,8 +129,32 @@ def main(cfg: DictConfig) -> None:
                 start_time=cfg.data_cfg.start_time,
                 return_fluid_params=cfg.data_cfg.return_fluid_params,
             )
+    else:
+        raise ValueError(f"Experiment {cfg.expt} not supported")
+
     normalization_constants = train_dataset.normalize()
-    val_dataset = BubbleForecast(
+    if cfg.expt == "temp_prediction":
+        val_dataset = TempPredict(
+                filenames=cfg.data_cfg.val_paths,
+                input_fields=cfg.data_cfg.input_fields,
+                output_fields=cfg.data_cfg.output_fields,
+                norm=cfg.data_cfg.normalize,
+                downsample_factor=cfg.data_cfg.downsample_factor,
+                time_window=cfg.data_cfg.time_window,
+                start_time=cfg.data_cfg.start_time,
+            )
+    elif cfg.expt == "bulk_flow":
+        val_dataset = BulkFlow(
+                filenames=cfg.data_cfg.val_paths,
+                input_fields=cfg.data_cfg.input_fields,
+                output_fields=cfg.data_cfg.output_fields,
+                norm=cfg.data_cfg.normalize,
+                downsample_factor=cfg.data_cfg.downsample_factor,
+                time_window=cfg.data_cfg.time_window,
+                start_time=cfg.data_cfg.start_time,
+            )
+    elif cfg.expt == "forecast":
+        val_dataset = BubbleForecast(
                 filenames=cfg.data_cfg.val_paths,
                 input_fields=cfg.data_cfg.input_fields,
                 output_fields=cfg.data_cfg.output_fields,
@@ -118,7 +164,10 @@ def main(cfg: DictConfig) -> None:
                 start_time=cfg.data_cfg.start_time,
                 return_fluid_params=cfg.data_cfg.return_fluid_params,
             )
+    else:
+        raise ValueError(f"Experiment {cfg.expt} not supported")
     val_dataset.normalize(*normalization_constants)
+    
     diff_term = normalization_constants[0]
     div_term = normalization_constants[1]
 
@@ -132,12 +181,31 @@ def main(cfg: DictConfig) -> None:
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=cfg.batch_size,
-        shuffle=False,
+        shuffle=True,
         num_workers=4,
         pin_memory=True,
     )
-    if cfg.data_cfg.return_fluid_params:
-        train_module = ConditionedForecastModule(
+    if cfg.expt in ["forecast", "temp_prediction"]:
+        if cfg.data_cfg.return_fluid_params:
+            train_module = ConditionedForecastModule(
+                    model_cfg=cfg.model_cfg,
+                    data_cfg=cfg.data_cfg,
+                    optim_cfg=cfg.optim_cfg,
+                    scheduler_cfg=cfg.scheduler_cfg,
+                    log_wandb=cfg.use_wandb,
+                    normalization_constants=(diff_term, div_term),
+                )
+        else:
+            train_module = ForecastModule(
+                model_cfg=cfg.model_cfg,
+                data_cfg=cfg.data_cfg,
+                optim_cfg=cfg.optim_cfg,
+                scheduler_cfg=cfg.scheduler_cfg,
+                log_wandb=cfg.use_wandb,
+                normalization_constants=(diff_term, div_term),
+            )
+    elif cfg.expt == "bulk_flow":
+        train_module = BulkFlowModule(
                 model_cfg=cfg.model_cfg,
                 data_cfg=cfg.data_cfg,
                 optim_cfg=cfg.optim_cfg,
@@ -146,14 +214,7 @@ def main(cfg: DictConfig) -> None:
                 normalization_constants=(diff_term, div_term),
             )
     else:
-        train_module = ForecastModule(
-                model_cfg=cfg.model_cfg,
-                data_cfg=cfg.data_cfg,
-                optim_cfg=cfg.optim_cfg,
-                scheduler_cfg=cfg.scheduler_cfg,
-                log_wandb=cfg.use_wandb,
-                normalization_constants=(diff_term, div_term),
-            )
+        raise ValueError(f"Experiment {cfg.expt} not supported")
 
     trainer = Trainer(
         accelerator="gpu",

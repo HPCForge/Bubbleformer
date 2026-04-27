@@ -1,0 +1,14 @@
+dataset: lanl_singlebubble
+input_fields: ["rho", "temperature", "velx", "vely"]
+output_fields: ["rho", "temperature", "velx", "vely"]
+normalize: none
+downsample_factor: 1
+time_window: 5
+start_time: 0
+return_fluid_params: False
+train_paths:
+  - /share/crsp/lab/amowli/share/lanl-lbm-boiling/SingleBubble/train_0.0250_150_1_300_1e-5.h5
+  - /share/crsp/lab/amowli/share/lanl-lbm-boiling/SingleBubble/train_0.0250_150_1_300_2e-5.h5
+val_paths:
+  - /share/crsp/lab/amowli/share/lanl-lbm-boiling/SingleBubble/test_0.0250_150_1_300_1e-5.h5
+  - /share/crsp/lab/amowli/share/lanl-lbm-boiling/SingleBubble/test_0.0250_150_1_300_2e-5.h5
